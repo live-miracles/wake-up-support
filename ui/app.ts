@@ -38,7 +38,8 @@ declare global {
   }
 }
 
-const STORAGE_KEY = "wake-up-support.systems";
+const SYSTEMS_STORAGE_KEY = "wake-up-support.systems";
+const LOGS_STORAGE_KEY = "wake-up-support.logs";
 const DEFAULT_BROADCAST = "192.168.154.255";
 const MAX_LOG_ENTRIES = 300;
 
@@ -76,10 +77,10 @@ const alertText = document.getElementById("alert-text")!;
 
 let systems = loadSystems();
 const selectedIds = new Set<string>();
-let logEntries: LogEntry[] = [];
+let logEntries: LogEntry[] = loadLogs();
 
 function loadSystems(): SystemEntry[] {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  const saved = localStorage.getItem(SYSTEMS_STORAGE_KEY);
   if (!saved) return [];
 
   try {
@@ -90,7 +91,26 @@ function loadSystems(): SystemEntry[] {
 }
 
 function saveSystems() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(systems));
+  localStorage.setItem(SYSTEMS_STORAGE_KEY, JSON.stringify(systems));
+}
+
+function loadLogs(): LogEntry[] {
+  const saved = localStorage.getItem(LOGS_STORAGE_KEY);
+  if (!saved) return [];
+
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_LOG_ENTRIES) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLogs() {
+  localStorage.setItem(
+    LOGS_STORAGE_KEY,
+    JSON.stringify(logEntries.slice(0, MAX_LOG_ENTRIES)),
+  );
 }
 
 function normalizeMac(macAddress: string) {
@@ -182,7 +202,7 @@ function render() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
             <td>
-                <input type="checkbox" class="checkbox checkbox-primary system-check" data-id="${system.id}" ${selectedIds.has(system.id) ? "checked" : ""} />
+                <input type="checkbox" class="checkbox checkbox-primary checkbox-sm system-check" data-id="${system.id}" ${selectedIds.has(system.id) ? "checked" : ""} />
             </td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td class="font-mono">${escapeHtml(system.macAddress)}</td>
@@ -229,6 +249,7 @@ function addLog(result: WakeResult) {
     ...logEntries,
   ].slice(0, MAX_LOG_ENTRIES);
 
+  saveLogs();
   renderLog();
 }
 
@@ -278,7 +299,6 @@ form.addEventListener("submit", (event) => {
   } else {
     const id = crypto.randomUUID();
     systems.push({ ...formSystem, id });
-    selectedIds.add(id);
     showAlert("System added.", "success");
   }
 
@@ -361,6 +381,7 @@ document.getElementById("select-none-btn")!.addEventListener("click", () => {
 
 document.getElementById("clear-log-btn")!.addEventListener("click", () => {
   logEntries = [];
+  saveLogs();
   renderLog();
 });
 
@@ -454,3 +475,4 @@ window.addEventListener("keydown", (event) => {
 
 resetForm();
 render();
+renderLog();
