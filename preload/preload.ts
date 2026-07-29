@@ -7,9 +7,18 @@ type WakeRequest = {
   port: number;
 };
 
+type SystemStatusRequest = {
+  id: string;
+  macAddress: string;
+  ipAddress?: string;
+};
+
 contextBridge.exposeInMainWorld("api", {
   wakeSystems: (requests: WakeRequest[]) =>
     ipcRenderer.invoke("wake-systems", requests),
+  checkSystemStatuses: (systems: SystemStatusRequest[]) =>
+    ipcRenderer.invoke("check-system-statuses", systems),
+  scanLocalNetwork: () => ipcRenderer.invoke("scan-local-network"),
 
   onUpdateAvailable: (cb: () => void) => ipcRenderer.on("update-available", cb),
   onUpdateProgress: (cb: (progress: number) => void) =>

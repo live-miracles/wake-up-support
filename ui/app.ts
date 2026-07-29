@@ -2,6 +2,7 @@ type SystemEntry = {
   id: string;
   name: string;
   macAddress: string;
+  ipAddress?: string;
   broadcastAddress: string;
   port: number;
 };
@@ -19,6 +20,28 @@ type LogEntry = WakeResult & {
   time: string;
 };
 
+type SystemStatus = "online" | "offline" | "unknown" | "checking";
+
+type SystemStatusResult = {
+  id: string;
+  ipStatus: SystemStatus;
+  macStatus: SystemStatus;
+  actualMacForIp?: string;
+  ipsForMac: string[];
+};
+
+type NetworkScanDevice = {
+  ipAddress: string;
+  macAddress: string;
+  name?: string;
+};
+
+type NetworkScanResult = {
+  subnet: string;
+  localIp: string;
+  devices: NetworkScanDevice[];
+};
+
 type SettingsExport = {
   app: "wake-up-support";
   version: 1;
@@ -28,6 +51,10 @@ type SettingsExport = {
 
 type Api = {
   wakeSystems: (requests: SystemEntry[]) => Promise<WakeResult[]>;
+  checkSystemStatuses: (
+    systems: Pick<SystemEntry, "id" | "macAddress" | "ipAddress">[],
+  ) => Promise<SystemStatusResult[]>;
+  scanLocalNetwork: () => Promise<NetworkScanResult>;
   onUpdateAvailable: (cb: () => void) => void;
   onUpdateProgress: (cb: (progress: number) => void) => void;
   onUpdateReady: (cb: () => void) => void;
@@ -54,11 +81,15 @@ const systemModal = document.getElementById(
   "system-modal",
 ) as HTMLDialogElement;
 const logModal = document.getElementById("log-modal") as HTMLDialogElement;
+const scanModal = document.getElementById("scan-modal") as HTMLDialogElement;
 const systemModalTitle = document.getElementById("system-modal-title")!;
 const addSystemBtn = document.getElementById(
   "add-system-btn",
 ) as HTMLButtonElement;
 const showLogBtn = document.getElementById("show-log-btn") as HTMLButtonElement;
+const scanNetworkBtn = document.getElementById(
+  "scan-network-btn",
+) as HTMLButtonElement;
 const importSettingsBtn = document.getElementById(
   "import-settings-btn",
 ) as HTMLButtonElement;
@@ -74,6 +105,7 @@ const editingIdInput = document.getElementById(
 ) as HTMLInputElement;
 const nameInput = document.getElementById("name-input") as HTMLInputElement;
 const macInput = document.getElementById("mac-input") as HTMLInputElement;
+const ipInput = document.getElementById("ip-input") as HTMLInputElement;
 const broadcastInput = document.getElementById(
   "broadcast-input",
 ) as HTMLInputElement;
@@ -89,11 +121,20 @@ const systemsTable = document.getElementById(
 ) as HTMLTableSectionElement;
 const emptyState = document.getElementById("empty-state")!;
 const logList = document.getElementById("log-list")!;
+const scanSummary = document.getElementById("scan-summary")!;
+const scanWarningReport = document.getElementById("scan-warning-report")!;
+const scanTable = document.getElementById(
+  "scan-table",
+) as HTMLTableSectionElement;
+const scanEmptyState = document.getElementById("scan-empty-state")!;
 const alertBox = document.getElementById("alert")!;
 const alertText = document.getElementById("alert-text")!;
 
 let systems = loadSystems();
 let logEntries: LogEntry[] = loadLogs();
+const systemStatuses = new Map<string, SystemStatusResult>();
+const successTimers = new WeakMap<HTMLElement, number>();
+let statusCheckInProgress = false;
 
 function loadSystems(): SystemEntry[] {
   const saved = localStorage.getItem(SYSTEMS_STORAGE_KEY);
@@ -138,12 +179,27 @@ function formatMac(macAddress: string) {
   return normalized.match(/.{1,2}/g)?.join("-") ?? macAddress;
 }
 
+function isIpv4Address(value: string) {
+  const parts = value.split(".");
+  return (
+    parts.length === 4 &&
+    parts.every((part) => {
+      if (!/^\d{1,3}$/.test(part)) return false;
+      const octet = Number(part);
+      return octet >= 0 && octet <= 255;
+    })
+  );
+}
+
 function validateSystem(system: Omit<SystemEntry, "id">): string | null {
   if (!system.name.trim()) return "Enter a system name.";
   if (!/^[0-9A-F]{12}$/.test(normalizeMac(system.macAddress))) {
     return "Enter a valid 12-digit MAC address.";
   }
-  if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(system.broadcastAddress)) {
+  if (system.ipAddress && !isIpv4Address(system.ipAddress)) {
+    return "Enter a valid IPv4 address.";
+  }
+  if (!isIpv4Address(system.broadcastAddress)) {
     return "Enter a valid IPv4 broadcast address.";
   }
   if (
@@ -170,6 +226,8 @@ function validateImportedSystem(value: unknown, index: number): SystemEntry {
     name: typeof system.name === "string" ? system.name.trim() : "",
     macAddress:
       typeof system.macAddress === "string" ? formatMac(system.macAddress) : "",
+    ipAddress:
+      typeof system.ipAddress === "string" ? system.ipAddress.trim() : "",
     broadcastAddress:
       typeof system.broadcastAddress === "string"
         ? system.broadcastAddress.trim()
@@ -202,6 +260,7 @@ function getFormSystem(): Omit<SystemEntry, "id"> {
   return {
     name: nameInput.value.trim(),
     macAddress: formatMac(macInput.value),
+    ipAddress: ipInput.value.trim() || undefined,
     broadcastAddress: broadcastInput.value.trim(),
     port: Number(portInput.value),
   };
@@ -211,10 +270,13 @@ function resetForm() {
   editingIdInput.value = "";
   nameInput.value = "";
   macInput.value = "";
+  ipInput.value = "";
   broadcastInput.value = DEFAULT_BROADCAST;
   portInput.value = "9";
   systemModalTitle.textContent = "Add System";
   saveSystemBtn.textContent = "Add System";
+  saveSystemBtn.disabled = false;
+  cancelEditBtn.disabled = false;
 }
 
 function openSystemModal() {
@@ -230,9 +292,10 @@ function closeSystemModal() {
 function showAlert(
   message: string,
   type: "success" | "error" | "info" = "info",
+  durationMs = 3500,
 ) {
   alertBox.className =
-    "alert fixed top-3 left-1/2 z-50 max-w-[min(92vw,720px)] -translate-x-1/2 shadow-lg";
+    "alert fixed top-6 left-1/2 z-50 max-w-[min(92vw,720px)] -translate-x-1/2 shadow-lg";
   alertBox.classList.add(
     type === "success"
       ? "alert-success"
@@ -244,27 +307,68 @@ function showAlert(
 
   window.setTimeout(() => {
     alertBox.classList.add("hidden");
-  }, 3500);
+  }, durationMs);
 }
 
 function render() {
-  systems.sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, {
-      numeric: true,
-      sensitivity: "base",
-    }),
-  );
   systemsTable.innerHTML = "";
 
-  for (const system of systems) {
+  for (const [index, system] of systems.entries()) {
+    const status = systemStatuses.get(system.id);
+    const macStatus = status?.macStatus ?? "unknown";
+    const ipStatus = status?.ipStatus ?? "unknown";
+    const warningText = getMappingWarnings(system, status).join(". ");
+    const escapedWarningText = escapeHtml(warningText);
+    const ipTextClass = warningText ? "text-warning" : "";
     const tr = document.createElement("tr");
+    tr.className = "transition-all duration-200 ease-out";
+    tr.dataset.id = system.id;
     tr.innerHTML = `
+            <td class="text-base-content/60">${index + 1}</td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
-            <td class="font-mono">${escapeHtml(system.macAddress)}</td>
+            <td>
+                <div class="flex items-center gap-2 font-mono">
+                    <span class="${getMacStatusDotClass(macStatus)}" title="${getMacStatusText(macStatus)}" aria-label="${getMacStatusText(macStatus)}"></span>
+                    <span>${escapeHtml(system.macAddress)}</span>
+                </div>
+            </td>
+            <td>
+                <div class="flex items-center gap-2 font-mono" title="${escapedWarningText}">
+                    <span class="${getIpStatusDotClass(ipStatus, system)}" title="${getIpStatusText(ipStatus, system)}" aria-label="${getIpStatusText(ipStatus, system)}"></span>
+                    <span class="${ipTextClass}">${escapeHtml(system.ipAddress || "-")}</span>
+                    ${
+                      warningText
+                        ? `<svg aria-hidden="true" class="h-4 w-4 shrink-0 text-warning" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                            <path d="M12 9v4" />
+                            <path d="M12 17h.01" />
+                        </svg>
+                        <span class="sr-only">${escapedWarningText}</span>`
+                        : ""
+                    }
+                </div>
+            </td>
             <td class="font-mono">${escapeHtml(system.broadcastAddress)}</td>
             <td>${system.port}</td>
             <td>
                 <div class="flex justify-end gap-2">
+                    <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
+                            <path d="m20 6-11 11-5-5" />
+                        </svg>
+                    </span>
+                    <span class="flex gap-0.5">
+                        <button class="btn btn-square btn-ghost btn-xs move-up" data-id="${system.id}" title="Move up" aria-label="Move up" ${index === 0 ? "disabled" : ""}>
+                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="m18 15-6-6-6 6" />
+                            </svg>
+                        </button>
+                        <button class="btn btn-square btn-ghost btn-xs move-down" data-id="${system.id}" title="Move down" aria-label="Move down" ${index === systems.length - 1 ? "disabled" : ""}>
+                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                    </span>
                     <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">Wake</button>
                     <button class="btn btn-square btn-outline btn-xs edit-one" data-id="${system.id}" title="Edit" aria-label="Edit">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
@@ -287,6 +391,148 @@ function render() {
   }
 
   emptyState.classList.toggle("hidden", systems.length > 0);
+}
+
+function getStatusDotBaseClass(status: SystemStatus) {
+  const colorClass =
+    status === "online"
+      ? "bg-primary"
+      : status === "offline"
+        ? "bg-error"
+        : "bg-base-content/30";
+
+  return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
+}
+
+function getMacStatusDotClass(status: SystemStatus) {
+  return getStatusDotBaseClass(status);
+}
+
+function getIpStatusDotClass(status: SystemStatus, system: SystemEntry) {
+  if (!system.ipAddress) {
+    return "invisible block h-3 w-3 shrink-0 rounded-full";
+  }
+
+  return getStatusDotBaseClass(status);
+}
+
+function getMacStatusText(status: SystemStatus) {
+  if (status === "checking") return "Checking MAC status";
+  if (status === "online") return "MAC found on local network";
+  if (status === "offline") return "MAC not found on local network";
+  return "MAC status unknown";
+}
+
+function getIpStatusText(status: SystemStatus, system: SystemEntry) {
+  if (!system.ipAddress) return "No IP address set";
+  if (status === "checking") return "Checking status";
+  if (status === "online") return "Online";
+  if (status === "offline") return "Offline";
+  return "Status unknown";
+}
+
+function getMappingWarnings(
+  system: SystemEntry,
+  status: SystemStatusResult | undefined,
+) {
+  if (!status) return [];
+
+  const warnings: string[] = [];
+  const normalizedMac = normalizeMac(system.macAddress);
+  const actualMac = status.actualMacForIp
+    ? normalizeMac(status.actualMacForIp)
+    : "";
+  const otherIps = status.ipsForMac.filter((ip) => ip !== system.ipAddress);
+
+  if (system.ipAddress && actualMac && actualMac !== normalizedMac) {
+    warnings.push(
+      `IP ${system.ipAddress} is assigned to MAC ${status.actualMacForIp}`,
+    );
+  }
+
+  if (otherIps.length > 0) {
+    warnings.push(
+      `MAC ${system.macAddress} also appears at IP ${otherIps.join(", ")}`,
+    );
+  }
+
+  return warnings;
+}
+
+function isScanDeviceAdded(device: NetworkScanDevice) {
+  const normalizedDeviceMac = normalizeMac(device.macAddress);
+
+  return systems.some(
+    (system) =>
+      normalizeMac(system.macAddress) === normalizedDeviceMac &&
+      system.ipAddress === device.ipAddress,
+  );
+}
+
+function getBroadcastAddress(ipAddress: string) {
+  const parts = ipAddress.split(".");
+  return parts.length === 4
+    ? `${parts.slice(0, 3).join(".")}.255`
+    : DEFAULT_BROADCAST;
+}
+
+function renderScanResults(result: NetworkScanResult) {
+  scanSummary.textContent = `Local IP ${result.localIp}, scanned ${result.subnet}. Found ${result.devices.length} device(s).`;
+  scanTable.innerHTML = "";
+
+  for (const [index, device] of result.devices.entries()) {
+    const tr = document.createElement("tr");
+    const added = isScanDeviceAdded(device);
+
+    tr.innerHTML = `
+            <td class="text-base-content/60">${index + 1}</td>
+            <td class="font-mono">${escapeHtml(device.ipAddress)}</td>
+            <td class="font-mono">${escapeHtml(device.macAddress)}</td>
+            <td>${escapeHtml(device.name || "-")}</td>
+            <td>
+                ${
+                  added
+                    ? ""
+                    : `<button class="btn btn-outline btn-xs add-scanned-device" data-ip="${escapeHtml(device.ipAddress)}" data-mac="${escapeHtml(device.macAddress)}" data-name="${escapeHtml(device.name || "")}" title="Add system">Add</button>`
+                }
+            </td>
+        `;
+    scanTable.appendChild(tr);
+  }
+
+  scanEmptyState.classList.toggle("hidden", result.devices.length > 0);
+}
+
+function renderScanWarnings(warnings: string[]) {
+  scanWarningReport.innerHTML = "";
+  scanWarningReport.classList.toggle("hidden", warnings.length === 0);
+
+  if (warnings.length === 0) return;
+
+  const title = document.createElement("div");
+  title.className = "mb-2 font-semibold text-warning";
+  title.textContent = `Mapping warning${warnings.length === 1 ? "" : "s"}`;
+  scanWarningReport.appendChild(title);
+
+  const list = document.createElement("ul");
+  list.className = "list-disc space-y-1 pl-5";
+
+  for (const warning of warnings) {
+    const item = document.createElement("li");
+    item.textContent = warning;
+    list.appendChild(item);
+  }
+
+  scanWarningReport.appendChild(list);
+}
+
+function renderScanLoading() {
+  scanSummary.innerHTML =
+    '<span class="loading loading-spinner loading-sm text-primary"></span>';
+  scanWarningReport.classList.add("hidden");
+  scanWarningReport.innerHTML = "";
+  scanTable.innerHTML = "";
+  scanEmptyState.classList.add("hidden");
 }
 
 function escapeHtml(value: string) {
@@ -327,6 +573,42 @@ function addLog(result: WakeResult) {
   renderLog();
 }
 
+function showInlineSuccess(successIcon: HTMLElement, durationMs = 1000) {
+  const existingTimer = successTimers.get(successIcon);
+  if (existingTimer) clearTimeout(existingTimer);
+
+  successIcon.classList.remove("invisible");
+  successTimers.set(
+    successIcon,
+    window.setTimeout(() => {
+      successIcon.classList.add("invisible");
+      successTimers.delete(successIcon);
+    }, durationMs),
+  );
+}
+
+function showWakeSuccess(button: HTMLButtonElement) {
+  const successIcon = button.parentElement?.querySelector(
+    ".wake-success",
+  ) as HTMLElement | null;
+
+  if (successIcon) showInlineSuccess(successIcon);
+}
+
+function moveSystem(id: string, direction: -1 | 1) {
+  const currentIndex = systems.findIndex((system) => system.id === id);
+  const nextIndex = currentIndex + direction;
+
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= systems.length) {
+    return;
+  }
+
+  const [system] = systems.splice(currentIndex, 1);
+  systems.splice(nextIndex, 0, system);
+  saveSystems();
+  render();
+}
+
 function exportSettings() {
   const settings: SettingsExport = {
     app: "wake-up-support",
@@ -360,13 +642,37 @@ async function importSettings(file: File) {
     if (!confirmed) return;
 
     systems = importedSystems;
+    systemStatuses.clear();
     saveSystems();
     render();
+    refreshStatuses();
     showAlert(`Imported ${systems.length} system(s).`, "success");
   } catch (err) {
     showAlert(err instanceof Error ? err.message : String(err), "error");
   } finally {
     importSettingsInput.value = "";
+  }
+}
+
+async function scanLocalNetwork() {
+  scanNetworkBtn.disabled = true;
+  scanNetworkBtn.textContent = "Scanning";
+  renderScanLoading();
+  scanModal.showModal();
+
+  try {
+    const result = await window.api.scanLocalNetwork();
+    renderScanResults(result);
+    const warnings = await refreshStatuses();
+    renderScanWarnings(warnings);
+  } catch (err) {
+    scanSummary.textContent = "";
+    renderScanWarnings([]);
+    scanEmptyState.classList.remove("hidden");
+    showAlert(err instanceof Error ? err.message : String(err), "error");
+  } finally {
+    scanNetworkBtn.disabled = false;
+    scanNetworkBtn.textContent = "Scan";
   }
 }
 
@@ -383,7 +689,14 @@ async function wakeEntries(
   try {
     const results = await window.api.wakeSystems(entries);
     results.forEach(addLog);
+    window.setTimeout(refreshStatuses, 5000);
     const failures = results.filter((result) => !result.ok);
+
+    if (failures.length === 0 && wakeButtons.length > 0) {
+      wakeButtons.forEach(showWakeSuccess);
+      return;
+    }
+
     showAlert(
       failures.length === 0
         ? `Sent wake signal to ${results.length} system(s).`
@@ -411,17 +724,15 @@ form.addEventListener("submit", (event) => {
     systems = systems.map((system) =>
       system.id === editingId ? { ...formSystem, id: editingId } : system,
     );
-    showAlert("System updated.", "success");
   } else {
     const id = crypto.randomUUID();
     systems.push({ ...formSystem, id });
-    showAlert("System added.", "success");
   }
 
   saveSystems();
-  resetForm();
-  systemModal.close();
+  closeSystemModal();
   render();
+  refreshStatuses();
 });
 
 addSystemBtn.addEventListener("click", () => {
@@ -429,6 +740,7 @@ addSystemBtn.addEventListener("click", () => {
   openSystemModal();
 });
 showLogBtn.addEventListener("click", () => logModal.showModal());
+scanNetworkBtn.addEventListener("click", scanLocalNetwork);
 exportSettingsBtn.addEventListener("click", exportSettings);
 importSettingsBtn.addEventListener("click", () => importSettingsInput.click());
 importSettingsInput.addEventListener("change", () => {
@@ -441,6 +753,26 @@ cancelEditBtn.addEventListener("click", closeSystemModal);
 systemModal.addEventListener("cancel", () => resetForm());
 systemModal.addEventListener("close", () => resetForm());
 
+scanTable.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const button = target.closest(
+    "button.add-scanned-device",
+  ) as HTMLButtonElement | null;
+
+  if (!button) return;
+
+  editingIdInput.value = "";
+  nameInput.value = button.dataset.name || "";
+  macInput.value = button.dataset.mac ?? "";
+  ipInput.value = button.dataset.ip ?? "";
+  broadcastInput.value = getBroadcastAddress(button.dataset.ip ?? "");
+  portInput.value = "9";
+  systemModalTitle.textContent = "Add System";
+  saveSystemBtn.textContent = "Add System";
+  scanModal.close();
+  openSystemModal();
+});
+
 systemsTable.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
   const button = target.closest("button");
@@ -450,6 +782,14 @@ systemsTable.addEventListener("click", (event) => {
   const system = systems.find((entry) => entry.id === id);
   if (!id || !system) return;
 
+  if (button.classList.contains("move-up")) {
+    moveSystem(id, -1);
+  }
+
+  if (button.classList.contains("move-down")) {
+    moveSystem(id, 1);
+  }
+
   if (button.classList.contains("wake-one")) {
     wakeEntries([system], [button as HTMLButtonElement]);
   }
@@ -458,6 +798,7 @@ systemsTable.addEventListener("click", (event) => {
     editingIdInput.value = system.id;
     nameInput.value = system.name;
     macInput.value = system.macAddress;
+    ipInput.value = system.ipAddress ?? "";
     broadcastInput.value = system.broadcastAddress;
     portInput.value = String(system.port);
     systemModalTitle.textContent = "Edit System";
@@ -469,10 +810,24 @@ systemsTable.addEventListener("click", (event) => {
     const confirmed = confirm(`Delete ${system.name}?`);
     if (!confirmed) return;
 
-    systems = systems.filter((entry) => entry.id !== id);
-    saveSystems();
-    render();
-    showAlert("System deleted.", "success");
+    const row = button.closest("tr") as HTMLTableRowElement | null;
+    const removeSystem = () => {
+      systems = systems.filter((entry) => entry.id !== id);
+      systemStatuses.delete(id);
+      saveSystems();
+      render();
+    };
+
+    if (!row) {
+      removeSystem();
+      return;
+    }
+
+    row.querySelectorAll("button").forEach((rowButton) => {
+      rowButton.disabled = true;
+    });
+    row.classList.add("system-row-removing");
+    window.setTimeout(removeSystem, 220);
   }
 });
 
@@ -481,6 +836,82 @@ document.getElementById("clear-log-btn")!.addEventListener("click", () => {
   saveLogs();
   renderLog();
 });
+
+async function refreshStatuses(showResultAlert = false): Promise<string[]> {
+  if (statusCheckInProgress) return [];
+
+  if (systems.length === 0) {
+    systemStatuses.clear();
+    render();
+    return [];
+  }
+
+  statusCheckInProgress = true;
+  systems.forEach((system) => {
+    const currentStatus = systemStatuses.get(system.id);
+    systemStatuses.set(system.id, {
+      id: system.id,
+      ipStatus: system.ipAddress ? "checking" : "unknown",
+      macStatus: "checking",
+      actualMacForIp: currentStatus?.actualMacForIp,
+      ipsForMac: currentStatus?.ipsForMac ?? [],
+    });
+  });
+  render();
+
+  try {
+    const results = await window.api.checkSystemStatuses(
+      systems.map(({ id, macAddress, ipAddress }) => ({
+        id,
+        macAddress,
+        ipAddress,
+      })),
+    );
+
+    results.forEach((result) => systemStatuses.set(result.id, result));
+    render();
+    const warningDetails = getMappingWarningDetails(results);
+
+    if (showResultAlert) {
+      showAlert(
+        warningDetails.length === 0
+          ? "IP and MAC mappings checked."
+          : `Found ${warningDetails.length} mapping warning(s):\n${warningDetails.join("\n")}`,
+        warningDetails.length === 0 ? "success" : "error",
+        warningDetails.length === 0 ? 3500 : 12000,
+      );
+    }
+
+    return warningDetails;
+  } catch {
+    systems.forEach((system) =>
+      systemStatuses.set(system.id, {
+        id: system.id,
+        ipStatus: "unknown",
+        macStatus: "unknown",
+        ipsForMac: [],
+      }),
+    );
+    render();
+    return [];
+  } finally {
+    statusCheckInProgress = false;
+  }
+}
+
+function getMappingWarningDetails(results: SystemStatusResult[]) {
+  return results.flatMap((result) => {
+    const system = systems.find((entry) => entry.id === result.id);
+    if (!system) return [];
+
+    const rowNumber = systems.findIndex((entry) => entry.id === result.id) + 1;
+    const warnings = getMappingWarnings(system, result);
+
+    return warnings.map(
+      (warning) => `Row ${rowNumber} (${system.name}): ${warning}`,
+    );
+  });
+}
 
 const updateText = document.getElementById("update-text")!;
 const updateBtn = document.getElementById("update-btn")!;
@@ -493,7 +924,7 @@ const updateToast = document.getElementById("update-toast")!;
 
 window.api.onUpdateAvailable(() => {
   updateToast.classList.remove("hidden");
-  updateText.textContent = "A new release is ready to download.";
+  updateText.textContent = "";
   updateProgress.classList.add("hidden");
   updateBtn.classList.add("hidden");
   updateDownloadBtn.classList.remove("hidden");
@@ -506,7 +937,7 @@ window.api.onUpdateProgress((p: number) => {
 });
 
 window.api.onUpdateReady(() => {
-  updateText.textContent = "Downloaded. Restart to install.";
+  updateText.textContent = "Downloaded";
   updateProgress.classList.add("hidden");
   updateBtn.classList.remove("hidden");
   updateDownloadBtn.classList.add("hidden");
@@ -573,3 +1004,5 @@ window.addEventListener("keydown", (event) => {
 resetForm();
 render();
 renderLog();
+refreshStatuses();
+window.setInterval(refreshStatuses, 10000);
