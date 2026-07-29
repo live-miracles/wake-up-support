@@ -49,6 +49,18 @@ type SettingsExport = {
   systems: SystemEntry[];
 };
 
+type SystemField =
+  | "name"
+  | "macAddress"
+  | "ipAddress"
+  | "broadcastAddress"
+  | "port";
+
+type ValidationResult = {
+  message: string;
+  fields: SystemField[];
+};
+
 type Api = {
   wakeSystems: (requests: SystemEntry[]) => Promise<WakeResult[]>;
   checkSystemStatuses: (
@@ -76,6 +88,7 @@ const SYSTEMS_STORAGE_KEY = "wake-up-support.systems";
 const LOGS_STORAGE_KEY = "wake-up-support.logs";
 const DEFAULT_BROADCAST = "192.168.154.255";
 const MAX_LOG_ENTRIES = 300;
+const DELETE_ANIMATION_MS = 420;
 
 const systemModal = document.getElementById(
   "system-modal",
@@ -110,6 +123,7 @@ const broadcastInput = document.getElementById(
   "broadcast-input",
 ) as HTMLInputElement;
 const portInput = document.getElementById("port-input") as HTMLInputElement;
+const systemFormError = document.getElementById("system-form-error")!;
 const saveSystemBtn = document.getElementById(
   "save-system-btn",
 ) as HTMLButtonElement;
@@ -191,23 +205,36 @@ function isIpv4Address(value: string) {
   );
 }
 
-function validateSystem(system: Omit<SystemEntry, "id">): string | null {
-  if (!system.name.trim()) return "Enter a system name.";
+function validateSystem(
+  system: Omit<SystemEntry, "id">,
+): ValidationResult | null {
+  if (!system.name.trim()) {
+    return { message: "Enter a system name.", fields: ["name"] };
+  }
   if (!/^[0-9A-F]{12}$/.test(normalizeMac(system.macAddress))) {
-    return "Enter a valid 12-digit MAC address.";
+    return {
+      message: "Enter a valid 12-digit MAC address.",
+      fields: ["macAddress"],
+    };
   }
   if (system.ipAddress && !isIpv4Address(system.ipAddress)) {
-    return "Enter a valid IPv4 address.";
+    return { message: "Enter a valid IPv4 address.", fields: ["ipAddress"] };
   }
   if (!isIpv4Address(system.broadcastAddress)) {
-    return "Enter a valid IPv4 broadcast address.";
+    return {
+      message: "Enter a valid IPv4 broadcast address.",
+      fields: ["broadcastAddress"],
+    };
   }
   if (
     !Number.isInteger(system.port) ||
     system.port < 1 ||
     system.port > 65535
   ) {
-    return "Enter a valid UDP port between 1 and 65535.";
+    return {
+      message: "Enter a valid UDP port between 1 and 65535.",
+      fields: ["port"],
+    };
   }
   return null;
 }
@@ -237,7 +264,7 @@ function validateImportedSystem(value: unknown, index: number): SystemEntry {
   const validationError = validateSystem(importedSystem);
 
   if (validationError) {
-    throw new Error(`System ${index + 1}: ${validationError}`);
+    throw new Error(`System ${index + 1}: ${validationError.message}`);
   }
 
   return importedSystem;
@@ -266,6 +293,42 @@ function getFormSystem(): Omit<SystemEntry, "id"> {
   };
 }
 
+function getSystemFieldInput(field: SystemField) {
+  return {
+    name: nameInput,
+    macAddress: macInput,
+    ipAddress: ipInput,
+    broadcastAddress: broadcastInput,
+    port: portInput,
+  }[field];
+}
+
+function clearSystemFormValidation() {
+  systemFormError.classList.add("hidden");
+  systemFormError.textContent = "";
+
+  ([nameInput, macInput, ipInput, broadcastInput, portInput] as const).forEach(
+    (input) => {
+      input.classList.remove("input-error");
+      input.removeAttribute("aria-invalid");
+    },
+  );
+}
+
+function showSystemFormValidationError(validationError: ValidationResult) {
+  clearSystemFormValidation();
+  systemFormError.textContent = validationError.message;
+  systemFormError.classList.remove("hidden");
+
+  validationError.fields.forEach((field) => {
+    const input = getSystemFieldInput(field);
+    input.classList.add("input-error");
+    input.setAttribute("aria-invalid", "true");
+  });
+
+  getSystemFieldInput(validationError.fields[0]).focus();
+}
+
 function resetForm() {
   editingIdInput.value = "";
   nameInput.value = "";
@@ -277,6 +340,7 @@ function resetForm() {
   saveSystemBtn.textContent = "Add System";
   saveSystemBtn.disabled = false;
   cancelEditBtn.disabled = false;
+  clearSystemFormValidation();
 }
 
 function openSystemModal() {
@@ -321,7 +385,7 @@ function render() {
     const escapedWarningText = escapeHtml(warningText);
     const ipTextClass = warningText ? "text-warning" : "";
     const tr = document.createElement("tr");
-    tr.className = "transition-all duration-200 ease-out";
+    tr.className = "transition-all duration-500 ease-out";
     tr.dataset.id = system.id;
     tr.innerHTML = `
             <td class="text-base-content/60">${index + 1}</td>
@@ -715,7 +779,7 @@ form.addEventListener("submit", (event) => {
   const formSystem = getFormSystem();
   const validationError = validateSystem(formSystem);
   if (validationError) {
-    showAlert(validationError, "error");
+    showSystemFormValidationError(validationError);
     return;
   }
 
@@ -749,6 +813,9 @@ importSettingsInput.addEventListener("change", () => {
     importSettings(file);
   }
 });
+([nameInput, macInput, ipInput, broadcastInput, portInput] as const).forEach(
+  (input) => input.addEventListener("input", clearSystemFormValidation),
+);
 cancelEditBtn.addEventListener("click", closeSystemModal);
 systemModal.addEventListener("cancel", () => resetForm());
 systemModal.addEventListener("close", () => resetForm());
@@ -827,7 +894,7 @@ systemsTable.addEventListener("click", (event) => {
       rowButton.disabled = true;
     });
     row.classList.add("system-row-removing");
-    window.setTimeout(removeSystem, 220);
+    window.setTimeout(removeSystem, DELETE_ANIMATION_MS);
   }
 });
 

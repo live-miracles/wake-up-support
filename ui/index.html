@@ -75,7 +75,7 @@
           </div>
         </div>
 
-        <form id="system-form" class="space-y-3">
+        <form id="system-form" class="space-y-3" novalidate>
           <input id="editing-id" type="hidden" />
           <div class="grid gap-3 md:grid-cols-2">
             <fieldset class="fieldset">
@@ -140,6 +140,8 @@
             such as Dell machines, Deep Sleep Control also need to be disabled
             so the LAN card keeps power while shut down.
           </p>
+
+          <p id="system-form-error" class="hidden text-sm text-error"></p>
 
           <div class="modal-action">
             <button id="cancel-edit-btn" class="btn" type="button">

@@ -11,7 +11,8 @@ body {
 
 .system-row-removing {
   opacity: 0;
-  transform: translateX(0.75rem) scale(0.98);
+  transform: scale(0.98);
+  transform-origin: center;
 }
 
 .system-row-removing > td {
@@ -20,7 +21,7 @@ body {
   padding-bottom: 0;
   padding-top: 0;
   transition:
-    border-width 220ms ease,
-    line-height 220ms ease,
-    padding 220ms ease;
+    border-width 420ms ease,
+    line-height 420ms ease,
+    padding 420ms ease;
 }
