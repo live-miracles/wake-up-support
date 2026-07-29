@@ -39,7 +39,8 @@
     "publish": {
       "provider": "github",
       "owner": "live-miracles",
-      "repo": "wake-up-support"
+      "repo": "wake-up-support",
+      "releaseType": "release"
     }
   },
   "devDependencies": {
