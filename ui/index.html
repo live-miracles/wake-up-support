@@ -1,5 +1,5 @@
 <!doctype html>
-<html data-theme="corporate">
+<html data-theme="dim">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -141,6 +141,32 @@
       </form>
     </dialog>
 
+    <dialog id="log-modal" class="modal">
+      <div class="modal-box max-w-2xl">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold">Wake Log</h2>
+          <form method="dialog">
+            <button class="btn btn-square btn-ghost btn-sm" aria-label="Close">
+              x
+            </button>
+          </form>
+        </div>
+        <div
+          id="log-list"
+          class="max-h-96 space-y-2 overflow-y-auto text-sm"
+        ></div>
+        <div class="modal-action">
+          <button id="clear-log-btn" class="btn btn-ghost">Clear</button>
+          <form method="dialog">
+            <button class="btn btn-primary">Done</button>
+          </form>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
     <main class="flex h-full flex-col">
       <header class="border-b border-base-300 bg-base-100 px-5 py-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -150,35 +176,69 @@
               Send Wake-on-LAN signals to systems on your local network.
             </p>
           </div>
-          <div class="flex gap-2">
-            <button id="add-system-btn" class="btn btn-outline">
-              Add System
+          <div class="flex flex-wrap justify-end gap-2">
+            <button
+              id="show-log-btn"
+              class="btn btn-square btn-outline btn-sm"
+              title="Wake logs"
+              aria-label="Wake logs"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 8v5l3 2" />
+                <path d="M3.05 11a9 9 0 1 1 2.64 6.36" />
+                <path d="M3 16v-5h5" />
+              </svg>
             </button>
-            <button id="wake-selected-btn" class="btn btn-primary">
-              Power On Selected
+            <button id="import-settings-btn" class="btn btn-outline btn-sm">
+              Import
             </button>
+            <button id="export-settings-btn" class="btn btn-outline btn-sm">
+              Export
+            </button>
+            <button
+              id="add-system-btn"
+              class="btn btn-square btn-outline btn-sm"
+              title="Add system"
+              aria-label="Add system"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+            <input
+              id="import-settings-input"
+              class="hidden"
+              type="file"
+              accept="application/json,.json"
+            />
           </div>
         </div>
       </header>
 
       <section class="min-h-0 flex-1 overflow-y-auto p-4">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div class="join">
-            <button id="select-all-btn" class="btn join-item btn-sm">
-              Select All
-            </button>
-            <button id="select-none-btn" class="btn join-item btn-sm">
-              Select None
-            </button>
-          </div>
-          <div id="summary-text" class="text-sm text-base-content/70"></div>
-        </div>
-
         <div class="overflow-x-auto rounded border border-base-300">
           <table class="table table-zebra table-sm">
             <thead>
               <tr>
-                <th class="w-12"></th>
                 <th>Name</th>
                 <th>MAC Address</th>
                 <th>Broadcast</th>
@@ -195,19 +255,6 @@
             Add your first system to start sending Wake-on-LAN packets.
           </div>
         </div>
-
-        <section class="mt-4 rounded border border-base-300 bg-base-200/40 p-3">
-          <div class="mb-2 flex items-center justify-between">
-            <h2 class="font-semibold">Wake Log</h2>
-            <button id="clear-log-btn" class="btn btn-ghost btn-xs">
-              Clear
-            </button>
-          </div>
-          <div
-            id="log-list"
-            class="max-h-48 space-y-2 overflow-y-auto text-sm"
-          ></div>
-        </section>
       </section>
     </main>
 

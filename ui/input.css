@@ -1,8 +1,8 @@
 @import "tailwindcss";
 @plugin 'daisyui' {
   themes:
-    corporate --default,
-    dim;
+    dim --default,
+    corporate;
 }
 
 body {

@@ -19,6 +19,13 @@ type LogEntry = WakeResult & {
   time: string;
 };
 
+type SettingsExport = {
+  app: "wake-up-support";
+  version: 1;
+  exportedAt: string;
+  systems: SystemEntry[];
+};
+
 type Api = {
   wakeSystems: (requests: SystemEntry[]) => Promise<WakeResult[]>;
   onUpdateAvailable: (cb: () => void) => void;
@@ -46,10 +53,21 @@ const MAX_LOG_ENTRIES = 300;
 const systemModal = document.getElementById(
   "system-modal",
 ) as HTMLDialogElement;
+const logModal = document.getElementById("log-modal") as HTMLDialogElement;
 const systemModalTitle = document.getElementById("system-modal-title")!;
 const addSystemBtn = document.getElementById(
   "add-system-btn",
 ) as HTMLButtonElement;
+const showLogBtn = document.getElementById("show-log-btn") as HTMLButtonElement;
+const importSettingsBtn = document.getElementById(
+  "import-settings-btn",
+) as HTMLButtonElement;
+const exportSettingsBtn = document.getElementById(
+  "export-settings-btn",
+) as HTMLButtonElement;
+const importSettingsInput = document.getElementById(
+  "import-settings-input",
+) as HTMLInputElement;
 const form = document.getElementById("system-form") as HTMLFormElement;
 const editingIdInput = document.getElementById(
   "editing-id",
@@ -70,13 +88,11 @@ const systemsTable = document.getElementById(
   "systems-table",
 ) as HTMLTableSectionElement;
 const emptyState = document.getElementById("empty-state")!;
-const summaryText = document.getElementById("summary-text")!;
 const logList = document.getElementById("log-list")!;
 const alertBox = document.getElementById("alert")!;
 const alertText = document.getElementById("alert-text")!;
 
 let systems = loadSystems();
-const selectedIds = new Set<string>();
 let logEntries: LogEntry[] = loadLogs();
 
 function loadSystems(): SystemEntry[] {
@@ -140,6 +156,48 @@ function validateSystem(system: Omit<SystemEntry, "id">): string | null {
   return null;
 }
 
+function validateImportedSystem(value: unknown, index: number): SystemEntry {
+  if (!value || typeof value !== "object") {
+    throw new Error(`System ${index + 1} is not valid.`);
+  }
+
+  const system = value as Partial<SystemEntry>;
+  const importedSystem: SystemEntry = {
+    id:
+      typeof system.id === "string" && system.id
+        ? system.id
+        : crypto.randomUUID(),
+    name: typeof system.name === "string" ? system.name.trim() : "",
+    macAddress:
+      typeof system.macAddress === "string" ? formatMac(system.macAddress) : "",
+    broadcastAddress:
+      typeof system.broadcastAddress === "string"
+        ? system.broadcastAddress.trim()
+        : "",
+    port: Number(system.port),
+  };
+  const validationError = validateSystem(importedSystem);
+
+  if (validationError) {
+    throw new Error(`System ${index + 1}: ${validationError}`);
+  }
+
+  return importedSystem;
+}
+
+function getImportedSystems(value: unknown): SystemEntry[] {
+  const systemsValue =
+    value && typeof value === "object" && "systems" in value
+      ? (value as Partial<SettingsExport>).systems
+      : value;
+
+  if (!Array.isArray(systemsValue)) {
+    throw new Error("Choose a Wake Up Support settings JSON file.");
+  }
+
+  return systemsValue.map(validateImportedSystem);
+}
+
 function getFormSystem(): Omit<SystemEntry, "id"> {
   return {
     name: nameInput.value.trim(),
@@ -201,9 +259,6 @@ function render() {
   for (const system of systems) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-            <td>
-                <input type="checkbox" class="checkbox checkbox-primary checkbox-sm system-check" data-id="${system.id}" ${selectedIds.has(system.id) ? "checked" : ""} />
-            </td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td class="font-mono">${escapeHtml(system.macAddress)}</td>
             <td class="font-mono">${escapeHtml(system.broadcastAddress)}</td>
@@ -211,8 +266,20 @@ function render() {
             <td>
                 <div class="flex justify-end gap-2">
                     <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">Wake</button>
-                    <button class="btn btn-outline btn-xs edit-one" data-id="${system.id}">Edit</button>
-                    <button class="btn btn-error btn-xs delete-one" data-id="${system.id}">Delete</button>
+                    <button class="btn btn-square btn-outline btn-xs edit-one" data-id="${system.id}" title="Edit" aria-label="Edit">
+                        <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
+                        </svg>
+                    </button>
+                    <button class="btn btn-square btn-error btn-xs delete-one" data-id="${system.id}" title="Delete" aria-label="Delete">
+                        <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4h8v2" />
+                            <path d="M19 6l-1 14H6L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                        </svg>
+                    </button>
                 </div>
             </td>
         `;
@@ -220,7 +287,6 @@ function render() {
   }
 
   emptyState.classList.toggle("hidden", systems.length > 0);
-  summaryText.textContent = `${selectedIds.size} selected of ${systems.length} systems`;
 }
 
 function escapeHtml(value: string) {
@@ -231,6 +297,14 @@ function escapeHtml(value: string) {
 
 function renderLog() {
   logList.innerHTML = "";
+
+  if (logEntries.length === 0) {
+    const emptyLog = document.createElement("div");
+    emptyLog.className = "py-8 text-center text-base-content/70";
+    emptyLog.textContent = "No wake logs yet.";
+    logList.appendChild(emptyLog);
+    return;
+  }
 
   for (const entry of logEntries) {
     const item = document.createElement("div");
@@ -253,15 +327,57 @@ function addLog(result: WakeResult) {
   renderLog();
 }
 
-async function wakeEntries(entries: SystemEntry[]) {
+function exportSettings() {
+  const settings: SettingsExport = {
+    app: "wake-up-support",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    systems,
+  };
+  const blob = new Blob([JSON.stringify(settings, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const date = new Date().toISOString().slice(0, 10);
+
+  link.href = url;
+  link.download = `wake-up-support-settings-${date}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showAlert(`Exported ${systems.length} system(s).`, "success");
+}
+
+async function importSettings(file: File) {
+  try {
+    const importedSystems = getImportedSystems(JSON.parse(await file.text()));
+    const confirmed =
+      systems.length === 0 ||
+      confirm(
+        `Import ${importedSystems.length} system(s)? This will replace your current list.`,
+      );
+
+    if (!confirmed) return;
+
+    systems = importedSystems;
+    saveSystems();
+    render();
+    showAlert(`Imported ${systems.length} system(s).`, "success");
+  } catch (err) {
+    showAlert(err instanceof Error ? err.message : String(err), "error");
+  } finally {
+    importSettingsInput.value = "";
+  }
+}
+
+async function wakeEntries(
+  entries: SystemEntry[],
+  wakeButtons: HTMLButtonElement[] = [],
+) {
   if (entries.length === 0) {
-    showAlert("Select at least one system first.", "error");
+    showAlert("Add a system first.", "error");
     return;
   }
-
-  const wakeButtons = [
-    document.getElementById("wake-selected-btn") as HTMLButtonElement,
-  ];
 
   wakeButtons.forEach((button) => (button.disabled = true));
   try {
@@ -312,6 +428,15 @@ addSystemBtn.addEventListener("click", () => {
   resetForm();
   openSystemModal();
 });
+showLogBtn.addEventListener("click", () => logModal.showModal());
+exportSettingsBtn.addEventListener("click", exportSettings);
+importSettingsBtn.addEventListener("click", () => importSettingsInput.click());
+importSettingsInput.addEventListener("change", () => {
+  const file = importSettingsInput.files?.[0];
+  if (file) {
+    importSettings(file);
+  }
+});
 cancelEditBtn.addEventListener("click", closeSystemModal);
 systemModal.addEventListener("cancel", () => resetForm());
 systemModal.addEventListener("close", () => resetForm());
@@ -326,7 +451,7 @@ systemsTable.addEventListener("click", (event) => {
   if (!id || !system) return;
 
   if (button.classList.contains("wake-one")) {
-    wakeEntries([system]);
+    wakeEntries([system], [button as HTMLButtonElement]);
   }
 
   if (button.classList.contains("edit-one")) {
@@ -345,38 +470,10 @@ systemsTable.addEventListener("click", (event) => {
     if (!confirmed) return;
 
     systems = systems.filter((entry) => entry.id !== id);
-    selectedIds.delete(id);
     saveSystems();
     render();
     showAlert("System deleted.", "success");
   }
-});
-
-systemsTable.addEventListener("change", (event) => {
-  const target = event.target as HTMLInputElement;
-  if (!target.classList.contains("system-check")) return;
-
-  if (target.checked) {
-    selectedIds.add(target.dataset.id ?? "");
-  } else {
-    selectedIds.delete(target.dataset.id ?? "");
-  }
-  selectedIds.delete("");
-  render();
-});
-
-document.getElementById("wake-selected-btn")!.addEventListener("click", () => {
-  wakeEntries(systems.filter((system) => selectedIds.has(system.id)));
-});
-
-document.getElementById("select-all-btn")!.addEventListener("click", () => {
-  systems.forEach((system) => selectedIds.add(system.id));
-  render();
-});
-
-document.getElementById("select-none-btn")!.addEventListener("click", () => {
-  selectedIds.clear();
-  render();
 });
 
 document.getElementById("clear-log-btn")!.addEventListener("click", () => {
