@@ -16,7 +16,7 @@ type ExecFileError = Error & {
 export type AjaPowerRequest = {
   name: string;
   ipmiIp: string;
-  secondaryIpmiIp?: string;
+  ipAddress?: string;
   username: string;
   password: string;
 };
@@ -170,7 +170,7 @@ async function runIpmitoolCommand(
 }
 
 function getIpmiIps(request: AjaPowerRequest) {
-  return [request.ipmiIp, request.secondaryIpmiIp]
+  return [request.ipmiIp]
     .map((ipmiIp) => ipmiIp?.trim())
     .filter((ipmiIp, index, ipmiIps): ipmiIp is string =>
       Boolean(ipmiIp && ipmiIps.indexOf(ipmiIp) === index),

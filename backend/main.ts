@@ -129,8 +129,8 @@ function setupZoom(win: BrowserWindow) {
 
 type SystemStatusRequest = {
   id: string;
-  macAddress: string;
   ipAddress?: string;
+  macAddress?: string;
 };
 
 type SystemStatusResult = {
@@ -182,20 +182,28 @@ async function checkSystemStatuses(
   const arpEntries = await getArpEntries();
 
   return systems.map((system) => {
-    const normalizedMac = normalizeMac(system.macAddress);
+    const normalizedMac = system.macAddress
+      ? normalizeMac(system.macAddress)
+      : "";
     const actualMacForIp = system.ipAddress
       ? arpEntries.get(system.ipAddress)
       : undefined;
-    const ipsForMac = [...arpEntries.entries()]
-      .filter(([, mac]) => mac === normalizedMac)
-      .map(([ip]) => ip);
+    const ipsForMac = normalizedMac
+      ? [...arpEntries.entries()]
+          .filter(([, mac]) => mac === normalizedMac)
+          .map(([ip]) => ip)
+      : [];
 
     return {
       id: system.id,
       ipStatus: system.ipAddress
         ? (pingResults.get(system.id) ?? "unknown")
         : "unknown",
-      macStatus: ipsForMac.length > 0 ? "online" : "offline",
+      macStatus: normalizedMac
+        ? ipsForMac.length > 0
+          ? "online"
+          : "offline"
+        : "unknown",
       actualMacForIp: actualMacForIp ? formatMac(actualMacForIp) : undefined,
       ipsForMac,
     };

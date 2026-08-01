@@ -13,7 +13,7 @@ type AjaSystemEntry = {
   type: "aja-ipmi";
   name: string;
   ipmiIp: string;
-  secondaryIpmiIp?: string;
+  ipAddress?: string;
   username: string;
   password: string;
 };
@@ -81,9 +81,14 @@ type SystemField =
   | "broadcastAddress"
   | "port"
   | "ipmiIp"
-  | "secondaryIpmiIp"
   | "username"
   | "password";
+
+type SystemStatusRequest = {
+  id: string;
+  ipAddress?: string;
+  macAddress?: string;
+};
 
 type ValidationResult = {
   message: string;
@@ -96,7 +101,7 @@ type Api = {
   powerOffAja: (requests: AjaSystemEntry[]) => Promise<ActionResult[]>;
   checkAjaStatuses: (requests: AjaSystemEntry[]) => Promise<AjaStatusResult[]>;
   checkSystemStatuses: (
-    systems: Pick<WolSystemEntry, "id" | "macAddress" | "ipAddress">[],
+    systems: SystemStatusRequest[],
   ) => Promise<SystemStatusResult[]>;
   scanLocalNetwork: () => Promise<NetworkScanResult>;
   onUpdateAvailable: (cb: () => void) => void;
@@ -128,8 +133,18 @@ const systemModal = document.getElementById(
 const ajaModal = document.getElementById("aja-modal") as HTMLDialogElement;
 const logModal = document.getElementById("log-modal") as HTMLDialogElement;
 const scanModal = document.getElementById("scan-modal") as HTMLDialogElement;
+const powerOffConfirmModal = document.getElementById(
+  "power-off-confirm-modal",
+) as HTMLDialogElement;
+const deleteConfirmModal = document.getElementById(
+  "delete-confirm-modal",
+) as HTMLDialogElement;
+const docsModal = document.getElementById("docs-modal") as HTMLDialogElement;
 const systemModalTitle = document.getElementById("system-modal-title")!;
 const ajaModalTitle = document.getElementById("aja-modal-title")!;
+const showDocsBtn = document.getElementById(
+  "show-docs-btn",
+) as HTMLButtonElement;
 const addSystemBtn = document.getElementById(
   "add-system-btn",
 ) as HTMLButtonElement;
@@ -168,9 +183,7 @@ const ajaNameInput = document.getElementById(
 const ipmiIpInput = document.getElementById(
   "ipmi-ip-input",
 ) as HTMLInputElement;
-const secondaryIpmiIpInput = document.getElementById(
-  "secondary-ipmi-ip-input",
-) as HTMLInputElement;
+const ajaIpInput = document.getElementById("aja-ip-input") as HTMLInputElement;
 const ipmiUserInput = document.getElementById(
   "ipmi-user-input",
 ) as HTMLInputElement;
@@ -209,6 +222,8 @@ const scanTable = document.getElementById(
 const scanEmptyState = document.getElementById("scan-empty-state")!;
 const alertBox = document.getElementById("alert")!;
 const alertText = document.getElementById("alert-text")!;
+const powerOffConfirmText = document.getElementById("power-off-confirm-text")!;
+const deleteConfirmText = document.getElementById("delete-confirm-text")!;
 
 let systems = loadSystems();
 let logEntries: LogEntry[] = loadLogs();
@@ -266,10 +281,12 @@ function normalizeStoredSystem(value: unknown): SystemEntry | null {
       type: "aja-ipmi",
       name: typeof system.name === "string" ? system.name : "",
       ipmiIp: typeof system.ipmiIp === "string" ? system.ipmiIp : "",
-      secondaryIpmiIp:
-        typeof system.secondaryIpmiIp === "string"
-          ? system.secondaryIpmiIp
-          : undefined,
+      ipAddress:
+        typeof system.ipAddress === "string"
+          ? system.ipAddress
+          : typeof system.secondaryIpmiIp === "string"
+            ? system.secondaryIpmiIp
+            : undefined,
       username:
         typeof system.username === "string"
           ? system.username
@@ -355,10 +372,10 @@ function validateSystem(system: SystemDraft): ValidationResult | null {
         fields: ["ipmiIp"],
       };
     }
-    if (system.secondaryIpmiIp && !isIpv4Address(system.secondaryIpmiIp)) {
+    if (system.ipAddress && !isIpv4Address(system.ipAddress)) {
       return {
-        message: "Enter a valid AJA LAN 2 IPMI IPv4 address.",
-        fields: ["secondaryIpmiIp"],
+        message: "Enter a valid AJA IPv4 address.",
+        fields: ["ipAddress"],
       };
     }
     if (!system.username.trim()) {
@@ -414,7 +431,7 @@ function validateImportedSystem(value: unknown, index: number): SystemEntry {
           ...normalized,
           name: normalized.name.trim(),
           ipmiIp: normalized.ipmiIp.trim(),
-          secondaryIpmiIp: normalized.secondaryIpmiIp?.trim() || undefined,
+          ipAddress: normalized.ipAddress?.trim() || undefined,
           username: normalized.username.trim(),
         }
       : {
@@ -464,7 +481,7 @@ function getAjaFormSystem(): Omit<AjaSystemEntry, "id"> {
     type: "aja-ipmi",
     name: ajaNameInput.value.trim(),
     ipmiIp: ipmiIpInput.value.trim(),
-    secondaryIpmiIp: secondaryIpmiIpInput.value.trim() || undefined,
+    ipAddress: ajaIpInput.value.trim() || undefined,
     username: ipmiUserInput.value.trim(),
     password: ipmiPassInput.value.trim(),
   };
@@ -478,7 +495,6 @@ function getSystemFieldInput(field: SystemField) {
     broadcastAddress: broadcastInput,
     port: portInput,
     ipmiIp: ipmiIpInput,
-    secondaryIpmiIp: secondaryIpmiIpInput,
     username: ipmiUserInput,
     password: ipmiPassInput,
   }[field];
@@ -488,11 +504,10 @@ function getAjaFieldInput(field: SystemField) {
   return {
     name: ajaNameInput,
     macAddress: ajaNameInput,
-    ipAddress: ipmiIpInput,
+    ipAddress: ajaIpInput,
     broadcastAddress: ipmiIpInput,
     port: ipmiIpInput,
     ipmiIp: ipmiIpInput,
-    secondaryIpmiIp: secondaryIpmiIpInput,
     username: ipmiUserInput,
     password: ipmiPassInput,
   }[field];
@@ -518,7 +533,7 @@ function clearAjaFormValidation() {
     [
       ajaNameInput,
       ipmiIpInput,
-      secondaryIpmiIpInput,
+      ajaIpInput,
       ipmiUserInput,
       ipmiPassInput,
     ] as const
@@ -574,7 +589,7 @@ function resetAjaForm() {
   editingAjaIdInput.value = "";
   ajaNameInput.value = "";
   ipmiIpInput.value = "";
-  secondaryIpmiIpInput.value = "";
+  ajaIpInput.value = "";
   ipmiUserInput.value = "ADMIN";
   ipmiPassInput.value = "";
   ipmiPassInput.type = "password";
@@ -642,17 +657,25 @@ function render() {
     const status = ajaStatuses.get(system.id);
     const powerStatus = status?.powerStatus ?? "unknown";
     const statusText = getAjaPowerStatusText(powerStatus, status?.message);
+    const ipStatus = systemStatuses.get(system.id)?.ipStatus ?? "unknown";
     const tr = document.createElement("tr");
     tr.className = "transition-all duration-500 ease-out";
     tr.dataset.id = system.id;
     tr.innerHTML = `
             <td class="text-base-content/60">${index + 1}</td>
-            <td>
-                <span class="${getAjaPowerStatusDotClass(powerStatus)}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}"></span>
-            </td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
-            <td class="font-mono">${escapeHtml(system.ipmiIp)}</td>
-            <td class="font-mono">${escapeHtml(system.secondaryIpmiIp ?? "")}</td>
+            <td>
+                <div class="flex items-center gap-2 font-mono">
+                    <span class="${getAjaPowerStatusDotClass(powerStatus)}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}"></span>
+                    <span>${escapeHtml(system.ipmiIp)}</span>
+                </div>
+            </td>
+            <td>
+                <div class="flex items-center gap-2 font-mono">
+                    <span class="${getIpStatusDotClass(ipStatus, system)}" title="${getIpStatusText(ipStatus, system)}" aria-label="${getIpStatusText(ipStatus, system)}"></span>
+                    <span>${escapeHtml(system.ipAddress || "-")}</span>
+                </div>
+            </td>
             <td>${escapeHtml(system.username)}</td>
             <td class="font-mono">${escapeHtml(getMaskedPasswordHint(system.password))}</td>
             <td>
@@ -674,8 +697,8 @@ function render() {
                             </svg>
                         </button>
                     </span>
-                    <button class="btn btn-primary btn-xs power-on-aja" data-id="${system.id}">Power On</button>
-                    <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Power Off</button>
+                    <button class="btn btn-primary btn-xs power-on-aja" data-id="${system.id}">On</button>
+                    <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Off</button>
                     <button class="btn btn-square btn-outline btn-xs edit-aja" data-id="${system.id}" title="Edit" aria-label="Edit">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
@@ -823,7 +846,10 @@ function getMacStatusDotClass(status: SystemStatus) {
   return getStatusDotBaseClass(status);
 }
 
-function getIpStatusDotClass(status: SystemStatus, system: WolSystemEntry) {
+function getIpStatusDotClass(
+  status: SystemStatus,
+  system: Pick<SystemEntry, "ipAddress">,
+) {
   if (!system.ipAddress) {
     return "invisible block h-3 w-3 shrink-0 rounded-full";
   }
@@ -838,7 +864,10 @@ function getMacStatusText(status: SystemStatus) {
   return "MAC status unknown";
 }
 
-function getIpStatusText(status: SystemStatus, system: WolSystemEntry) {
+function getIpStatusText(
+  status: SystemStatus,
+  system: Pick<SystemEntry, "ipAddress">,
+) {
   if (!system.ipAddress) return "No IP address set";
   if (status === "checking") return "Checking status";
   if (status === "online") return "Online";
@@ -1089,7 +1118,9 @@ async function importSettings(file: File) {
 
 async function scanLocalNetwork() {
   scanNetworkBtn.disabled = true;
-  scanNetworkBtn.textContent = "Scanning";
+  scanNetworkBtn.title = "Scanning local subnet";
+  scanNetworkBtn.setAttribute("aria-label", "Scanning local subnet");
+  scanNetworkBtn.setAttribute("aria-busy", "true");
   renderScanLoading();
   scanModal.showModal();
 
@@ -1105,7 +1136,12 @@ async function scanLocalNetwork() {
     showAlert(err instanceof Error ? err.message : String(err), "error");
   } finally {
     scanNetworkBtn.disabled = false;
-    scanNetworkBtn.textContent = "Scan";
+    scanNetworkBtn.title = "Scan local subnet and check mappings";
+    scanNetworkBtn.setAttribute(
+      "aria-label",
+      "Scan local subnet and check mappings",
+    );
+    scanNetworkBtn.removeAttribute("aria-busy");
   }
 }
 
@@ -1191,6 +1227,38 @@ function getFailureAlertMessage(total: number, failures: ActionResult[]) {
   return `Sent ${sentCount}, failed ${failures.length}.\n${details}`;
 }
 
+function confirmAjaPowerOff(system: AjaSystemEntry) {
+  if (powerOffConfirmModal.open) return Promise.resolve(false);
+
+  powerOffConfirmModal.returnValue = "";
+  powerOffConfirmText.textContent = `Send a power-off command to ${system.name}?`;
+  powerOffConfirmModal.showModal();
+
+  return new Promise<boolean>((resolve) => {
+    powerOffConfirmModal.addEventListener(
+      "close",
+      () => resolve(powerOffConfirmModal.returnValue === "off"),
+      { once: true },
+    );
+  });
+}
+
+function confirmDeleteSystem(system: SystemEntry) {
+  if (deleteConfirmModal.open) return Promise.resolve(false);
+
+  deleteConfirmModal.returnValue = "";
+  deleteConfirmText.textContent = `Delete ${system.name} from Wake Up Support?`;
+  deleteConfirmModal.showModal();
+
+  return new Promise<boolean>((resolve) => {
+    deleteConfirmModal.addEventListener(
+      "close",
+      () => resolve(deleteConfirmModal.returnValue === "delete"),
+      { once: true },
+    );
+  });
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   const formSystem = getFormSystem();
@@ -1249,6 +1317,7 @@ addAjaBtn.addEventListener("click", () => {
   resetAjaForm();
   openAjaModal();
 });
+showDocsBtn.addEventListener("click", () => docsModal.showModal());
 showLogBtn.addEventListener("click", () => logModal.showModal());
 scanNetworkBtn.addEventListener("click", scanLocalNetwork);
 exportSettingsBtn.addEventListener("click", exportSettings);
@@ -1263,13 +1332,7 @@ importSettingsInput.addEventListener("change", () => {
   (input) => input.addEventListener("input", clearSystemFormValidation),
 );
 (
-  [
-    ajaNameInput,
-    ipmiIpInput,
-    secondaryIpmiIpInput,
-    ipmiUserInput,
-    ipmiPassInput,
-  ] as const
+  [ajaNameInput, ipmiIpInput, ajaIpInput, ipmiUserInput, ipmiPassInput] as const
 ).forEach((input) => input.addEventListener("input", clearAjaFormValidation));
 cancelEditBtn.addEventListener("click", closeSystemModal);
 cancelAjaEditBtn.addEventListener("click", closeAjaModal);
@@ -1307,7 +1370,7 @@ scanTable.addEventListener("click", (event) => {
   openSystemModal();
 });
 
-systemsTable.addEventListener("click", (event) => {
+systemsTable.addEventListener("click", async (event) => {
   const target = event.target as HTMLElement;
   const button = target.closest("button");
   if (!button) return;
@@ -1341,7 +1404,7 @@ systemsTable.addEventListener("click", (event) => {
   }
 
   if (button.classList.contains("delete-one")) {
-    const confirmed = confirm(`Delete ${system.name}?`);
+    const confirmed = await confirmDeleteSystem(system);
     if (!confirmed) return;
 
     const row = button.closest("tr") as HTMLTableRowElement | null;
@@ -1366,7 +1429,7 @@ systemsTable.addEventListener("click", (event) => {
   }
 });
 
-ajaTable.addEventListener("click", (event) => {
+ajaTable.addEventListener("click", async (event) => {
   const target = event.target as HTMLElement;
   const button = target.closest("button");
   if (!button) return;
@@ -1388,6 +1451,9 @@ ajaTable.addEventListener("click", (event) => {
   }
 
   if (button.classList.contains("power-off-aja")) {
+    const confirmed = await confirmAjaPowerOff(system);
+    if (!confirmed) return;
+
     powerAjaEntries([system], "off", [button as HTMLButtonElement]);
   }
 
@@ -1395,7 +1461,7 @@ ajaTable.addEventListener("click", (event) => {
     editingAjaIdInput.value = system.id;
     ajaNameInput.value = system.name;
     ipmiIpInput.value = system.ipmiIp;
-    secondaryIpmiIpInput.value = system.secondaryIpmiIp ?? "";
+    ajaIpInput.value = system.ipAddress ?? "";
     ipmiUserInput.value = system.username;
     ipmiPassInput.value = system.password;
     ajaModalTitle.textContent = "Edit AJA Bridge Live";
@@ -1404,7 +1470,7 @@ ajaTable.addEventListener("click", (event) => {
   }
 
   if (button.classList.contains("delete-one")) {
-    const confirmed = confirm(`Delete ${system.name}?`);
+    const confirmed = await confirmDeleteSystem(system);
     if (!confirmed) return;
 
     const row = button.closest("tr") as HTMLTableRowElement | null;
@@ -1461,7 +1527,16 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
     });
   });
   ajaSystems.forEach((system) => {
+    const currentIpStatus = systemStatuses.get(system.id);
     const currentStatus = ajaStatuses.get(system.id);
+    systemStatuses.set(system.id, {
+      id: system.id,
+      ipStatus: system.ipAddress
+        ? (currentIpStatus?.ipStatus ?? "checking")
+        : "unknown",
+      macStatus: "unknown",
+      ipsForMac: [],
+    });
     ajaStatuses.set(system.id, {
       id: system.id,
       powerStatus: currentStatus?.powerStatus ?? "checking",
@@ -1473,25 +1548,28 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
   let warningDetails: string[] = [];
 
   try {
-    const [wolResults, ajaResults] = await Promise.all([
-      wolSystems.length > 0
-        ? window.api.checkSystemStatuses(
-            wolSystems.map(({ id, macAddress, ipAddress }) => ({
-              id,
-              macAddress,
-              ipAddress,
-            })),
-          )
+    const statusRequests: SystemStatusRequest[] = [
+      ...wolSystems.map(({ id, macAddress, ipAddress }) => ({
+        id,
+        macAddress,
+        ipAddress,
+      })),
+      ...ajaSystems.map(({ id, ipAddress }) => ({ id, ipAddress })),
+    ];
+
+    const [statusResults, ajaResults] = await Promise.all([
+      statusRequests.length > 0
+        ? window.api.checkSystemStatuses(statusRequests)
         : Promise.resolve([]),
       ajaSystems.length > 0
         ? window.api.checkAjaStatuses(ajaSystems)
         : Promise.resolve([]),
     ]);
 
-    wolResults.forEach((result) => systemStatuses.set(result.id, result));
+    statusResults.forEach((result) => systemStatuses.set(result.id, result));
     ajaResults.forEach((result) => ajaStatuses.set(result.id, result));
     render();
-    warningDetails = getMappingWarningDetails(wolResults);
+    warningDetails = getMappingWarningDetails(statusResults);
 
     if (showResultAlert) {
       showAlert(
@@ -1513,12 +1591,18 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
         ipsForMac: [],
       }),
     );
-    ajaSystems.forEach((system) =>
+    ajaSystems.forEach((system) => {
+      systemStatuses.set(system.id, {
+        id: system.id,
+        ipStatus: system.ipAddress ? "offline" : "unknown",
+        macStatus: "unknown",
+        ipsForMac: [],
+      });
       ajaStatuses.set(system.id, {
         id: system.id,
         powerStatus: "unreachable",
-      }),
-    );
+      });
+    });
     render();
     return [];
   } finally {

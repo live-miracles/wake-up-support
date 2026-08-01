@@ -10,7 +10,7 @@ type WakeRequest = {
 type AjaPowerRequest = {
   name: string;
   ipmiIp: string;
-  secondaryIpmiIp?: string;
+  ipAddress?: string;
   username: string;
   password: string;
 };
@@ -21,8 +21,8 @@ type AjaStatusRequest = AjaPowerRequest & {
 
 type SystemStatusRequest = {
   id: string;
-  macAddress: string;
   ipAddress?: string;
+  macAddress?: string;
 };
 
 contextBridge.exposeInMainWorld("api", {

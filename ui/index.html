@@ -187,11 +187,11 @@
               />
             </fieldset>
             <fieldset class="fieldset">
-              <legend class="fieldset-legend">AJA LAN 2 IPMI IP</legend>
+              <legend class="fieldset-legend">IP address</legend>
               <input
-                id="secondary-ipmi-ip-input"
+                id="aja-ip-input"
                 class="input w-full font-mono"
-                placeholder="Optional"
+                placeholder="192.168.1.51"
                 autocomplete="off"
               />
             </fieldset>
@@ -339,6 +339,179 @@
       </form>
     </dialog>
 
+    <dialog id="docs-modal" class="modal">
+      <div class="modal-box my-8 max-w-4xl">
+        <div class="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-semibold">Setup Docs</h2>
+            <p class="mt-1 text-sm text-base-content/70">
+              Enable the target hardware first, then add it to Wake Up Support.
+            </p>
+          </div>
+          <form method="dialog">
+            <button class="btn btn-square btn-ghost btn-sm" aria-label="Close">
+              x
+            </button>
+          </form>
+        </div>
+
+        <div class="space-y-5 text-sm leading-6">
+          <section class="rounded border border-base-300 p-4">
+            <h3 class="text-base font-semibold">Dell systems: Wake-on-LAN</h3>
+            <ol class="mt-3 list-decimal space-y-2 pl-5">
+              <li>
+                Open the Dell BIOS/UEFI setup and enable Wake-on-LAN. On many
+                Dell systems this is under Power Management.
+              </li>
+              <li>
+                Enable any option that allows wake from the built-in wired
+                network adapter. Use LAN only unless the site specifically needs
+                wake from another power state.
+              </li>
+              <li>
+                In Windows Device Manager, open the Ethernet adapter, then
+                enable wake options in the Power Management and Advanced tabs.
+              </li>
+              <li>
+                Add the system in Wake Up Support using the system name, MAC
+                address, optional IP address, subnet broadcast address, and WOL
+                port. Port 9 is the usual default.
+              </li>
+            </ol>
+            <p class="mt-3 text-base-content/70">
+              The broadcast address should match the subnet, for example
+              <span class="font-mono">192.168.154.255</span>.
+            </p>
+          </section>
+
+          <section class="rounded border border-base-300 p-4">
+            <h3 class="text-base font-semibold">
+              AJA Bridge Live: IPMI power control
+            </h3>
+            <p class="mt-3 text-base-content/70">
+              AJA Bridge Live power control uses IPMI instead of Wake-on-LAN.
+              Use SSH to prepare the IPMI user, then add the AJA LAN IPMI
+              address and credentials in the app.
+            </p>
+
+            <div class="mt-4 space-y-4">
+              <div>
+                <h4 class="font-semibold">Log in to the ABL CLI</h4>
+                <pre
+                  class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                ><code>ssh transcoder@&lt;abl-ip-address&gt;</code></pre>
+              </div>
+
+              <div>
+                <h4 class="font-semibold">Find the IPMI LAN address</h4>
+                <pre
+                  class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                ><code>sudo ipmitool lan print</code></pre>
+              </div>
+
+              <div>
+                <h4 class="font-semibold">Confirm the admin user number</h4>
+                <p class="mt-1 text-base-content/70">
+                  The admin user is usually user 2, but confirm it before
+                  changing the password.
+                </p>
+                <pre
+                  class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                ><code>sudo ipmitool user list</code></pre>
+              </div>
+
+              <div>
+                <h4 class="font-semibold">Set or reset the IPMI password</h4>
+                <pre
+                  class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                ><code>sudo ipmitool user set password 2</code></pre>
+              </div>
+
+              <div>
+                <h4 class="font-semibold">Enable admin IPMI access</h4>
+                <pre
+                  class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                ><code>sudo ipmitool user enable 2
+sudo ipmitool channel setaccess 1 2 link=on ipmi=on callin=on privilege=4</code></pre>
+              </div>
+
+              <div>
+                <h4 class="font-semibold">Fix channel cipher suites</h4>
+                <p class="mt-1 text-base-content/70">
+                  Allow the standard LAN channel cipher suites and explicitly
+                  permit cipher suite 3.
+                </p>
+                <pre
+                  class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                ><code>sudo ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
+sudo ipmitool raw 0x06 0x40 0x01 0x42 0x44</code></pre>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="modal-action">
+          <form method="dialog">
+            <button class="btn btn-primary">Done</button>
+          </form>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <dialog id="power-off-confirm-modal" class="modal">
+      <div class="modal-box max-w-md">
+        <h2 class="text-xl font-semibold">Turn Off Device?</h2>
+        <p
+          id="power-off-confirm-text"
+          class="mt-2 text-sm text-base-content/70"
+        >
+          This will send a power-off command to the selected AJA device.
+        </p>
+        <div class="modal-action">
+          <form method="dialog" class="flex gap-2">
+            <button class="btn" value="cancel">Cancel</button>
+            <button
+              id="confirm-power-off-btn"
+              class="btn btn-error"
+              value="off"
+            >
+              Off
+            </button>
+          </form>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button value="cancel">close</button>
+      </form>
+    </dialog>
+
+    <dialog id="delete-confirm-modal" class="modal">
+      <div class="modal-box max-w-md">
+        <h2 class="text-xl font-semibold">Delete System?</h2>
+        <p id="delete-confirm-text" class="mt-2 text-sm text-base-content/70">
+          This will remove the selected system from the app.
+        </p>
+        <div class="modal-action">
+          <form method="dialog" class="flex gap-2">
+            <button class="btn" value="cancel">Cancel</button>
+            <button
+              id="confirm-delete-btn"
+              class="btn btn-error"
+              value="delete"
+            >
+              Delete
+            </button>
+          </form>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button value="cancel">close</button>
+      </form>
+    </dialog>
+
     <main class="flex h-full flex-col">
       <header class="border-b border-base-300 bg-base-100 px-5 py-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -350,11 +523,51 @@
           </div>
           <div class="flex flex-wrap justify-end gap-2">
             <button
-              id="scan-network-btn"
-              class="btn btn-outline btn-sm"
-              title="Scan local subnet and check mappings"
+              id="show-docs-btn"
+              class="btn btn-square btn-outline btn-sm"
+              title="Setup docs"
+              aria-label="Setup docs"
             >
-              Scan
+              <svg
+                aria-hidden="true"
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 7v14" />
+                <path
+                  d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4v14a4 4 0 0 0-4-4Z"
+                />
+                <path
+                  d="M21 18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4v14a4 4 0 0 1 4-4Z"
+                />
+              </svg>
+            </button>
+            <button
+              id="scan-network-btn"
+              class="btn btn-square btn-outline btn-sm"
+              title="Scan local subnet and check mappings"
+              aria-label="Scan local subnet and check mappings"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M13.5 10.5 21 3" />
+                <path d="M16 3h5v5" />
+                <path d="M7.5 7.5a6 6 0 1 0 9 9" />
+                <path d="M11 11a2 2 0 1 0 2 2" />
+              </svg>
             </button>
             <button
               id="show-log-btn"
@@ -479,10 +692,9 @@
                 <thead>
                   <tr>
                     <th class="w-12">#</th>
-                    <th>Status</th>
                     <th>Name</th>
                     <th>LAN 1 IPMI IP</th>
-                    <th>LAN 2 IPMI IP</th>
+                    <th>IP Address</th>
                     <th>Username</th>
                     <th>Password</th>
                     <th class="w-72"></th>
