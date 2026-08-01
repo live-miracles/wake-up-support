@@ -13,6 +13,7 @@ type AjaSystemEntry = {
   type: "aja-ipmi";
   name: string;
   ipmiIp: string;
+  secondaryIpmiIp?: string;
   username: string;
   password: string;
 };
@@ -34,7 +35,7 @@ type LogEntry = ActionResult & {
 };
 
 type SystemStatus = "online" | "offline" | "unknown" | "checking";
-type AjaPowerStatus = "on" | "off" | "unknown" | "checking";
+type AjaPowerStatus = "on" | "off" | "unknown" | "checking" | "unreachable";
 
 type SystemStatusResult = {
   id: string;
@@ -46,7 +47,7 @@ type SystemStatusResult = {
 
 type AjaStatusResult = {
   id: string;
-  powerStatus: "on" | "off" | "unknown";
+  powerStatus: "on" | "off" | "unknown" | "unreachable";
   message?: string;
 };
 
@@ -80,6 +81,7 @@ type SystemField =
   | "broadcastAddress"
   | "port"
   | "ipmiIp"
+  | "secondaryIpmiIp"
   | "username"
   | "password";
 
@@ -166,6 +168,9 @@ const ajaNameInput = document.getElementById(
 const ipmiIpInput = document.getElementById(
   "ipmi-ip-input",
 ) as HTMLInputElement;
+const secondaryIpmiIpInput = document.getElementById(
+  "secondary-ipmi-ip-input",
+) as HTMLInputElement;
 const ipmiUserInput = document.getElementById(
   "ipmi-user-input",
 ) as HTMLInputElement;
@@ -242,23 +247,41 @@ function normalizeStoredSystem(value: unknown): SystemEntry | null {
     id?: unknown;
     name?: unknown;
     type?: string;
+    deviceType?: string;
     macAddress?: unknown;
     ipAddress?: unknown;
     broadcastAddress?: unknown;
     port?: unknown;
     ipmiIp?: unknown;
+    secondaryIpmiIp?: unknown;
     username?: unknown;
     password?: unknown;
+    ipmiUsername?: unknown;
+    ipmiPassword?: unknown;
   };
 
-  if (system.type === "aja-ipmi") {
+  if (system.type === "aja-ipmi" || system.deviceType === "aja_bridge_live") {
     return {
       id: typeof system.id === "string" ? system.id : crypto.randomUUID(),
       type: "aja-ipmi",
       name: typeof system.name === "string" ? system.name : "",
       ipmiIp: typeof system.ipmiIp === "string" ? system.ipmiIp : "",
-      username: typeof system.username === "string" ? system.username : "",
-      password: typeof system.password === "string" ? system.password : "",
+      secondaryIpmiIp:
+        typeof system.secondaryIpmiIp === "string"
+          ? system.secondaryIpmiIp
+          : undefined,
+      username:
+        typeof system.username === "string"
+          ? system.username
+          : typeof system.ipmiUsername === "string"
+            ? system.ipmiUsername
+            : "",
+      password:
+        typeof system.password === "string"
+          ? system.password
+          : typeof system.ipmiPassword === "string"
+            ? system.ipmiPassword
+            : "",
     };
   }
 
@@ -328,8 +351,14 @@ function validateSystem(system: SystemDraft): ValidationResult | null {
   if (system.type === "aja-ipmi") {
     if (!isIpv4Address(system.ipmiIp)) {
       return {
-        message: "Enter a valid AJA IPMI IPv4 address.",
+        message: "Enter a valid AJA LAN 1 IPMI IPv4 address.",
         fields: ["ipmiIp"],
+      };
+    }
+    if (system.secondaryIpmiIp && !isIpv4Address(system.secondaryIpmiIp)) {
+      return {
+        message: "Enter a valid AJA LAN 2 IPMI IPv4 address.",
+        fields: ["secondaryIpmiIp"],
       };
     }
     if (!system.username.trim()) {
@@ -385,6 +414,7 @@ function validateImportedSystem(value: unknown, index: number): SystemEntry {
           ...normalized,
           name: normalized.name.trim(),
           ipmiIp: normalized.ipmiIp.trim(),
+          secondaryIpmiIp: normalized.secondaryIpmiIp?.trim() || undefined,
           username: normalized.username.trim(),
         }
       : {
@@ -434,8 +464,9 @@ function getAjaFormSystem(): Omit<AjaSystemEntry, "id"> {
     type: "aja-ipmi",
     name: ajaNameInput.value.trim(),
     ipmiIp: ipmiIpInput.value.trim(),
+    secondaryIpmiIp: secondaryIpmiIpInput.value.trim() || undefined,
     username: ipmiUserInput.value.trim(),
-    password: ipmiPassInput.value,
+    password: ipmiPassInput.value.trim(),
   };
 }
 
@@ -447,6 +478,7 @@ function getSystemFieldInput(field: SystemField) {
     broadcastAddress: broadcastInput,
     port: portInput,
     ipmiIp: ipmiIpInput,
+    secondaryIpmiIp: secondaryIpmiIpInput,
     username: ipmiUserInput,
     password: ipmiPassInput,
   }[field];
@@ -460,6 +492,7 @@ function getAjaFieldInput(field: SystemField) {
     broadcastAddress: ipmiIpInput,
     port: ipmiIpInput,
     ipmiIp: ipmiIpInput,
+    secondaryIpmiIp: secondaryIpmiIpInput,
     username: ipmiUserInput,
     password: ipmiPassInput,
   }[field];
@@ -481,12 +514,18 @@ function clearAjaFormValidation() {
   ajaFormError.classList.add("hidden");
   ajaFormError.textContent = "";
 
-  ([ajaNameInput, ipmiIpInput, ipmiUserInput, ipmiPassInput] as const).forEach(
-    (input) => {
-      input.classList.remove("input-error");
-      input.removeAttribute("aria-invalid");
-    },
-  );
+  (
+    [
+      ajaNameInput,
+      ipmiIpInput,
+      secondaryIpmiIpInput,
+      ipmiUserInput,
+      ipmiPassInput,
+    ] as const
+  ).forEach((input) => {
+    input.classList.remove("input-error");
+    input.removeAttribute("aria-invalid");
+  });
 }
 
 function showSystemFormValidationError(validationError: ValidationResult) {
@@ -535,6 +574,7 @@ function resetAjaForm() {
   editingAjaIdInput.value = "";
   ajaNameInput.value = "";
   ipmiIpInput.value = "";
+  secondaryIpmiIpInput.value = "";
   ipmiUserInput.value = "ADMIN";
   ipmiPassInput.value = "";
   ipmiPassInput.type = "password";
@@ -607,14 +647,14 @@ function render() {
     tr.dataset.id = system.id;
     tr.innerHTML = `
             <td class="text-base-content/60">${index + 1}</td>
-            <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td>
-                <div class="flex items-center gap-2 font-mono" title="${escapeHtml(statusText)}">
-                    <span class="${getAjaPowerStatusDotClass(powerStatus)}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}"></span>
-                    <span>${escapeHtml(system.ipmiIp)}</span>
-                </div>
+                <span class="${getAjaPowerStatusDotClass(powerStatus)}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}"></span>
             </td>
+            <td class="font-semibold">${escapeHtml(system.name)}</td>
+            <td class="font-mono">${escapeHtml(system.ipmiIp)}</td>
+            <td class="font-mono">${escapeHtml(system.secondaryIpmiIp ?? "")}</td>
             <td>${escapeHtml(system.username)}</td>
+            <td class="font-mono">${escapeHtml(getMaskedPasswordHint(system.password))}</td>
             <td>
                 <div class="flex justify-end gap-2">
                     <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
@@ -748,7 +788,7 @@ function getAjaPowerStatusDotClass(status: AjaPowerStatus) {
   const colorClass =
     status === "on"
       ? "bg-primary"
-      : status === "off"
+      : status === "off" || status === "unreachable"
         ? "bg-error"
         : "bg-base-content/30";
 
@@ -759,7 +799,24 @@ function getAjaPowerStatusText(status: AjaPowerStatus, message?: string) {
   if (status === "checking") return "Checking AJA power status";
   if (status === "on") return "Powered on";
   if (status === "off") return "Powered off";
+  if (status === "unreachable") {
+    return message ? `Unable to reach AJA: ${message}` : "Unable to reach AJA";
+  }
   return message ? `Status unknown: ${message}` : "Power status unknown";
+}
+
+function getMaskedPasswordHint(password: string) {
+  const trimmedPassword = password.trim();
+
+  if (!trimmedPassword) {
+    return "(empty)";
+  }
+
+  if (trimmedPassword.length <= 4) {
+    return "...";
+  }
+
+  return `${trimmedPassword.slice(0, 2)}...${trimmedPassword.slice(-2)}`;
 }
 
 function getMacStatusDotClass(status: SystemStatus) {
@@ -1205,9 +1262,15 @@ importSettingsInput.addEventListener("change", () => {
 ([nameInput, macInput, ipInput, broadcastInput, portInput] as const).forEach(
   (input) => input.addEventListener("input", clearSystemFormValidation),
 );
-([ajaNameInput, ipmiIpInput, ipmiUserInput, ipmiPassInput] as const).forEach(
-  (input) => input.addEventListener("input", clearAjaFormValidation),
-);
+(
+  [
+    ajaNameInput,
+    ipmiIpInput,
+    secondaryIpmiIpInput,
+    ipmiUserInput,
+    ipmiPassInput,
+  ] as const
+).forEach((input) => input.addEventListener("input", clearAjaFormValidation));
 cancelEditBtn.addEventListener("click", closeSystemModal);
 cancelAjaEditBtn.addEventListener("click", closeAjaModal);
 toggleIpmiPassBtn.addEventListener("click", () => {
@@ -1332,6 +1395,7 @@ ajaTable.addEventListener("click", (event) => {
     editingAjaIdInput.value = system.id;
     ajaNameInput.value = system.name;
     ipmiIpInput.value = system.ipmiIp;
+    secondaryIpmiIpInput.value = system.secondaryIpmiIp ?? "";
     ipmiUserInput.value = system.username;
     ipmiPassInput.value = system.password;
     ajaModalTitle.textContent = "Edit AJA Bridge Live";
@@ -1388,8 +1452,10 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
     const currentStatus = systemStatuses.get(system.id);
     systemStatuses.set(system.id, {
       id: system.id,
-      ipStatus: system.ipAddress ? "checking" : "unknown",
-      macStatus: "checking",
+      ipStatus: system.ipAddress
+        ? (currentStatus?.ipStatus ?? "checking")
+        : "unknown",
+      macStatus: currentStatus?.macStatus ?? "checking",
       actualMacForIp: currentStatus?.actualMacForIp,
       ipsForMac: currentStatus?.ipsForMac ?? [],
     });
@@ -1398,7 +1464,7 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
     const currentStatus = ajaStatuses.get(system.id);
     ajaStatuses.set(system.id, {
       id: system.id,
-      powerStatus: "checking",
+      powerStatus: currentStatus?.powerStatus ?? "checking",
       message: currentStatus?.message,
     });
   });
@@ -1442,15 +1508,15 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
     wolSystems.forEach((system) =>
       systemStatuses.set(system.id, {
         id: system.id,
-        ipStatus: "unknown",
-        macStatus: "unknown",
+        ipStatus: system.ipAddress ? "offline" : "unknown",
+        macStatus: "offline",
         ipsForMac: [],
       }),
     );
     ajaSystems.forEach((system) =>
       ajaStatuses.set(system.id, {
         id: system.id,
-        powerStatus: "unknown",
+        powerStatus: "unreachable",
       }),
     );
     render();

@@ -10,6 +10,7 @@ type WakeRequest = {
 type AjaPowerRequest = {
   name: string;
   ipmiIp: string;
+  secondaryIpmiIp?: string;
   username: string;
   password: string;
 };

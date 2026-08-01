@@ -167,7 +167,7 @@
 
         <form id="aja-form" class="space-y-3" novalidate>
           <input id="editing-aja-id" type="hidden" />
-          <div class="grid gap-3 md:grid-cols-2">
+          <div class="grid gap-3 md:grid-cols-3">
             <fieldset class="fieldset">
               <legend class="fieldset-legend">Device name</legend>
               <input
@@ -178,11 +178,20 @@
               />
             </fieldset>
             <fieldset class="fieldset">
-              <legend class="fieldset-legend">AJA IPMI IP address</legend>
+              <legend class="fieldset-legend">AJA LAN 1 IPMI IP</legend>
               <input
                 id="ipmi-ip-input"
                 class="input w-full font-mono"
                 placeholder="192.168.1.50"
+                autocomplete="off"
+              />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">AJA LAN 2 IPMI IP</legend>
+              <input
+                id="secondary-ipmi-ip-input"
+                class="input w-full font-mono"
+                placeholder="Optional"
                 autocomplete="off"
               />
             </fieldset>
@@ -470,9 +479,12 @@
                 <thead>
                   <tr>
                     <th class="w-12">#</th>
+                    <th>Status</th>
                     <th>Name</th>
-                    <th>IPMI IP Address</th>
+                    <th>LAN 1 IPMI IP</th>
+                    <th>LAN 2 IPMI IP</th>
                     <th>Username</th>
+                    <th>Password</th>
                     <th class="w-72"></th>
                   </tr>
                 </thead>
