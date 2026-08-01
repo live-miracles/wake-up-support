@@ -14,6 +14,10 @@ type AjaPowerRequest = {
   password: string;
 };
 
+type AjaStatusRequest = AjaPowerRequest & {
+  id: string;
+};
+
 type SystemStatusRequest = {
   id: string;
   macAddress: string;
@@ -27,6 +31,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("power-on-aja", requests),
   powerOffAja: (requests: AjaPowerRequest[]) =>
     ipcRenderer.invoke("power-off-aja", requests),
+  checkAjaStatuses: (requests: AjaStatusRequest[]) =>
+    ipcRenderer.invoke("check-aja-statuses", requests),
   checkSystemStatuses: (systems: SystemStatusRequest[]) =>
     ipcRenderer.invoke("check-system-statuses", systems),
   scanLocalNetwork: () => ipcRenderer.invoke("scan-local-network"),

@@ -199,12 +199,38 @@
             </fieldset>
             <fieldset class="fieldset">
               <legend class="fieldset-legend">IPMI password</legend>
-              <input
-                id="ipmi-pass-input"
-                class="input w-full"
-                type="password"
-                autocomplete="off"
-              />
+              <label class="input flex w-full items-center gap-2">
+                <input
+                  id="ipmi-pass-input"
+                  class="grow"
+                  type="password"
+                  autocomplete="off"
+                />
+                <button
+                  id="toggle-ipmi-pass-btn"
+                  class="btn btn-square btn-ghost btn-xs"
+                  type="button"
+                  title="Show password"
+                  aria-label="Show password"
+                >
+                  <svg
+                    id="ipmi-pass-eye"
+                    aria-hidden="true"
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M2.1 12.5a10.4 10.4 0 0 1 19.8 0 10.4 10.4 0 0 1-19.8 0Z"
+                    />
+                    <circle cx="12" cy="12.5" r="3" />
+                  </svg>
+                </button>
+              </label>
             </fieldset>
           </div>
           <p class="text-sm text-base-content/70">

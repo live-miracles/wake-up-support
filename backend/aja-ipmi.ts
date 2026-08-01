@@ -18,6 +18,44 @@ export type AjaPowerResult = {
   message: string;
 };
 
+export type AjaStatusRequest = AjaPowerRequest & {
+  id: string;
+};
+
+export type AjaStatusResult = {
+  id: string;
+  powerStatus: "on" | "off" | "unknown";
+  message?: string;
+};
+
+export async function checkAjaBridgeStatus(
+  request: AjaStatusRequest,
+): Promise<AjaStatusResult> {
+  try {
+    const status = await runIpmiPowerCommand(request, "-c");
+
+    if (/power is on/i.test(status)) {
+      return { id: request.id, powerStatus: "on" };
+    }
+
+    if (/power is off/i.test(status)) {
+      return { id: request.id, powerStatus: "off" };
+    }
+
+    return {
+      id: request.id,
+      powerStatus: "unknown",
+      message: `Unable to read AJA power status. Details: ${status.trim()}`,
+    };
+  } catch (err) {
+    return {
+      id: request.id,
+      powerStatus: "unknown",
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export async function powerOnAjaBridge(
   request: AjaPowerRequest,
 ): Promise<AjaPowerResult> {
@@ -118,20 +156,27 @@ async function runIpmiPowerCommand(
 }
 
 function getIpmiutilPath() {
-  const bundledCandidates = [
+  const pathCandidates = (process.env.PATH ?? process.env.Path ?? "")
+    .split(path.delimiter)
+    .filter(Boolean)
+    .map((pathEntry) => path.join(pathEntry, "ipmiutil.exe"));
+  const checkedCandidates = [
     path.join(process.resourcesPath ?? "", "tools", "ipmiutil.exe"),
     path.join(process.cwd(), "tools", "ipmiutil.exe"),
+    path.join("C:", "Program Files", "ipmiutil", "ipmiutil.exe"),
+    path.join("C:", "Program Files (x86)", "ipmiutil", "ipmiutil.exe"),
+    ...pathCandidates,
   ];
 
-  const bundledPath = bundledCandidates.find(
+  const ipmiutilPath = checkedCandidates.find(
     (candidate) => candidate && existsSync(candidate),
   );
 
-  if (!bundledPath) {
+  if (!ipmiutilPath) {
     throw new Error(
-      "Bundled ipmiutil.exe was not found. Add it to the app's tools folder and rebuild the installer.",
+      `ipmiutil.exe was not found. Add it to the app's tools folder before building the installer, or install ipmiutil and add it to PATH. Checked: ${checkedCandidates.join("; ")}`,
     );
   }
 
-  return bundledPath;
+  return ipmiutilPath;
 }

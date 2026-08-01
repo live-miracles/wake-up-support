@@ -7,9 +7,11 @@ import { promisify } from "util";
 
 import updater from "electron-updater";
 import {
+  checkAjaBridgeStatus,
   powerOffAjaBridge,
   powerOnAjaBridge,
   type AjaPowerRequest,
+  type AjaStatusRequest,
 } from "./aja-ipmi.js";
 import { sendWakeOnLan, type WakeRequest } from "./wake-on-lan.js";
 
@@ -77,6 +79,15 @@ ipcMain.handle("power-on-aja", async (_, requests: AjaPowerRequest[]) => {
 ipcMain.handle("power-off-aja", async (_, requests: AjaPowerRequest[]) => {
   return Promise.all(requests.map((request) => powerOffAjaBridge(request)));
 });
+
+ipcMain.handle(
+  "check-aja-statuses",
+  async (_, requests: AjaStatusRequest[]) => {
+    return Promise.all(
+      requests.map((request) => checkAjaBridgeStatus(request)),
+    );
+  },
+);
 
 ipcMain.handle(
   "check-system-statuses",

@@ -34,6 +34,7 @@ type LogEntry = ActionResult & {
 };
 
 type SystemStatus = "online" | "offline" | "unknown" | "checking";
+type AjaPowerStatus = "on" | "off" | "unknown" | "checking";
 
 type SystemStatusResult = {
   id: string;
@@ -41,6 +42,16 @@ type SystemStatusResult = {
   macStatus: SystemStatus;
   actualMacForIp?: string;
   ipsForMac: string[];
+};
+
+type AjaStatusResult = {
+  id: string;
+  powerStatus: "on" | "off" | "unknown";
+  message?: string;
+};
+
+type AjaPowerStatusResult = Omit<AjaStatusResult, "powerStatus"> & {
+  powerStatus: AjaPowerStatus;
 };
 
 type NetworkScanDevice = {
@@ -81,6 +92,7 @@ type Api = {
   wakeSystems: (requests: WolSystemEntry[]) => Promise<ActionResult[]>;
   powerOnAja: (requests: AjaSystemEntry[]) => Promise<ActionResult[]>;
   powerOffAja: (requests: AjaSystemEntry[]) => Promise<ActionResult[]>;
+  checkAjaStatuses: (requests: AjaSystemEntry[]) => Promise<AjaStatusResult[]>;
   checkSystemStatuses: (
     systems: Pick<WolSystemEntry, "id" | "macAddress" | "ipAddress">[],
   ) => Promise<SystemStatusResult[]>;
@@ -160,6 +172,9 @@ const ipmiUserInput = document.getElementById(
 const ipmiPassInput = document.getElementById(
   "ipmi-pass-input",
 ) as HTMLInputElement;
+const toggleIpmiPassBtn = document.getElementById(
+  "toggle-ipmi-pass-btn",
+) as HTMLButtonElement;
 const systemFormError = document.getElementById("system-form-error")!;
 const ajaFormError = document.getElementById("aja-form-error")!;
 const saveSystemBtn = document.getElementById(
@@ -193,6 +208,7 @@ const alertText = document.getElementById("alert-text")!;
 let systems = loadSystems();
 let logEntries: LogEntry[] = loadLogs();
 const systemStatuses = new Map<string, SystemStatusResult>();
+const ajaStatuses = new Map<string, AjaPowerStatusResult>();
 const successTimers = new WeakMap<HTMLElement, number>();
 let statusCheckInProgress = false;
 
@@ -521,6 +537,9 @@ function resetAjaForm() {
   ipmiIpInput.value = "";
   ipmiUserInput.value = "ADMIN";
   ipmiPassInput.value = "";
+  ipmiPassInput.type = "password";
+  toggleIpmiPassBtn.title = "Show password";
+  toggleIpmiPassBtn.setAttribute("aria-label", "Show password");
   ajaModalTitle.textContent = "Add AJA Bridge Live";
   saveAjaBtn.textContent = "Add AJA";
   saveAjaBtn.disabled = false;
@@ -580,13 +599,21 @@ function render() {
   wolSection.classList.toggle("hidden", wolSystems.length === 0);
 
   for (const [index, system] of ajaSystems.entries()) {
+    const status = ajaStatuses.get(system.id);
+    const powerStatus = status?.powerStatus ?? "unknown";
+    const statusText = getAjaPowerStatusText(powerStatus, status?.message);
     const tr = document.createElement("tr");
     tr.className = "transition-all duration-500 ease-out";
     tr.dataset.id = system.id;
     tr.innerHTML = `
             <td class="text-base-content/60">${index + 1}</td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
-            <td class="font-mono">${escapeHtml(system.ipmiIp)}</td>
+            <td>
+                <div class="flex items-center gap-2 font-mono" title="${escapeHtml(statusText)}">
+                    <span class="${getAjaPowerStatusDotClass(powerStatus)}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}"></span>
+                    <span>${escapeHtml(system.ipmiIp)}</span>
+                </div>
+            </td>
             <td>${escapeHtml(system.username)}</td>
             <td>
                 <div class="flex justify-end gap-2">
@@ -715,6 +742,24 @@ function getStatusDotBaseClass(status: SystemStatus) {
         : "bg-base-content/30";
 
   return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
+}
+
+function getAjaPowerStatusDotClass(status: AjaPowerStatus) {
+  const colorClass =
+    status === "on"
+      ? "bg-primary"
+      : status === "off"
+        ? "bg-error"
+        : "bg-base-content/30";
+
+  return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
+}
+
+function getAjaPowerStatusText(status: AjaPowerStatus, message?: string) {
+  if (status === "checking") return "Checking AJA power status";
+  if (status === "on") return "Powered on";
+  if (status === "off") return "Powered off";
+  return message ? `Status unknown: ${message}` : "Power status unknown";
 }
 
 function getMacStatusDotClass(status: SystemStatus) {
@@ -973,6 +1018,7 @@ async function importSettings(file: File) {
 
     systems = importedSystems;
     systemStatuses.clear();
+    ajaStatuses.clear();
     saveSystems();
     render();
     refreshStatuses();
@@ -1057,6 +1103,7 @@ async function powerAjaEntries(
         ? await window.api.powerOnAja(entries)
         : await window.api.powerOffAja(entries);
     results.forEach(addLog);
+    window.setTimeout(refreshStatuses, 2000);
     const failures = results.filter((result) => !result.ok);
 
     if (failures.length === 0 && powerButtons.length > 0) {
@@ -1067,14 +1114,24 @@ async function powerAjaEntries(
     showAlert(
       failures.length === 0
         ? `Sent AJA ${action === "on" ? "power-on" : "power-off"} command to ${results.length} device(s).`
-        : `Sent ${results.length - failures.length}, failed ${failures.length}.`,
+        : getFailureAlertMessage(results.length, failures),
       failures.length === 0 ? "success" : "error",
+      failures.length === 0 ? 3500 : 12000,
     );
   } catch (err) {
     showAlert(err instanceof Error ? err.message : String(err), "error");
   } finally {
     powerButtons.forEach((button) => (button.disabled = false));
   }
+}
+
+function getFailureAlertMessage(total: number, failures: ActionResult[]) {
+  const sentCount = total - failures.length;
+  const details = failures
+    .map((failure) => `${failure.name}: ${failure.message}`)
+    .join("\n");
+
+  return `Sent ${sentCount}, failed ${failures.length}.\n${details}`;
 }
 
 form.addEventListener("submit", (event) => {
@@ -1124,6 +1181,7 @@ ajaForm.addEventListener("submit", (event) => {
   saveSystems();
   closeAjaModal();
   render();
+  refreshStatuses();
 });
 
 addSystemBtn.addEventListener("click", () => {
@@ -1152,6 +1210,15 @@ importSettingsInput.addEventListener("change", () => {
 );
 cancelEditBtn.addEventListener("click", closeSystemModal);
 cancelAjaEditBtn.addEventListener("click", closeAjaModal);
+toggleIpmiPassBtn.addEventListener("click", () => {
+  const showingPassword = ipmiPassInput.type === "text";
+  ipmiPassInput.type = showingPassword ? "password" : "text";
+  toggleIpmiPassBtn.title = showingPassword ? "Show password" : "Hide password";
+  toggleIpmiPassBtn.setAttribute(
+    "aria-label",
+    showingPassword ? "Show password" : "Hide password",
+  );
+});
 systemModal.addEventListener("cancel", () => resetForm());
 systemModal.addEventListener("close", () => resetForm());
 ajaModal.addEventListener("cancel", () => resetAjaForm());
@@ -1218,6 +1285,7 @@ systemsTable.addEventListener("click", (event) => {
     const removeSystem = () => {
       systems = systems.filter((entry) => entry.id !== id);
       systemStatuses.delete(id);
+      ajaStatuses.delete(id);
       saveSystems();
       render();
     };
@@ -1278,6 +1346,7 @@ ajaTable.addEventListener("click", (event) => {
     const row = button.closest("tr") as HTMLTableRowElement | null;
     const removeSystem = () => {
       systems = systems.filter((entry) => entry.id !== id);
+      ajaStatuses.delete(id);
       saveSystems();
       render();
     };
@@ -1305,9 +1374,11 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
   if (statusCheckInProgress) return [];
 
   const wolSystems = systems.filter(isWolSystem);
+  const ajaSystems = systems.filter(isAjaSystem);
 
-  if (wolSystems.length === 0) {
+  if (wolSystems.length === 0 && ajaSystems.length === 0) {
     systemStatuses.clear();
+    ajaStatuses.clear();
     render();
     return [];
   }
@@ -1323,20 +1394,38 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
       ipsForMac: currentStatus?.ipsForMac ?? [],
     });
   });
+  ajaSystems.forEach((system) => {
+    const currentStatus = ajaStatuses.get(system.id);
+    ajaStatuses.set(system.id, {
+      id: system.id,
+      powerStatus: "checking",
+      message: currentStatus?.message,
+    });
+  });
   render();
 
-  try {
-    const results = await window.api.checkSystemStatuses(
-      wolSystems.map(({ id, macAddress, ipAddress }) => ({
-        id,
-        macAddress,
-        ipAddress,
-      })),
-    );
+  let warningDetails: string[] = [];
 
-    results.forEach((result) => systemStatuses.set(result.id, result));
+  try {
+    const [wolResults, ajaResults] = await Promise.all([
+      wolSystems.length > 0
+        ? window.api.checkSystemStatuses(
+            wolSystems.map(({ id, macAddress, ipAddress }) => ({
+              id,
+              macAddress,
+              ipAddress,
+            })),
+          )
+        : Promise.resolve([]),
+      ajaSystems.length > 0
+        ? window.api.checkAjaStatuses(ajaSystems)
+        : Promise.resolve([]),
+    ]);
+
+    wolResults.forEach((result) => systemStatuses.set(result.id, result));
+    ajaResults.forEach((result) => ajaStatuses.set(result.id, result));
     render();
-    const warningDetails = getMappingWarningDetails(results);
+    warningDetails = getMappingWarningDetails(wolResults);
 
     if (showResultAlert) {
       showAlert(
@@ -1356,6 +1445,12 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
         ipStatus: "unknown",
         macStatus: "unknown",
         ipsForMac: [],
+      }),
+    );
+    ajaSystems.forEach((system) =>
+      ajaStatuses.set(system.id, {
+        id: system.id,
+        powerStatus: "unknown",
       }),
     );
     render();
