@@ -1,5 +1,6 @@
-type SystemEntry = {
+type WolSystemEntry = {
   id: string;
+  type: "wol";
   name: string;
   macAddress: string;
   ipAddress?: string;
@@ -7,16 +8,28 @@ type SystemEntry = {
   port: number;
 };
 
+type AjaSystemEntry = {
+  id: string;
+  type: "aja-ipmi";
+  name: string;
+  ipmiIp: string;
+  username: string;
+  password: string;
+};
+
+type SystemEntry = WolSystemEntry | AjaSystemEntry;
+type SystemDraft = Omit<WolSystemEntry, "id"> | Omit<AjaSystemEntry, "id">;
+
 export {};
 
-type WakeResult = {
+type ActionResult = {
   name: string;
-  macAddress: string;
+  macAddress?: string;
   ok: boolean;
   message: string;
 };
 
-type LogEntry = WakeResult & {
+type LogEntry = ActionResult & {
   time: string;
 };
 
@@ -54,7 +67,10 @@ type SystemField =
   | "macAddress"
   | "ipAddress"
   | "broadcastAddress"
-  | "port";
+  | "port"
+  | "ipmiIp"
+  | "username"
+  | "password";
 
 type ValidationResult = {
   message: string;
@@ -62,9 +78,11 @@ type ValidationResult = {
 };
 
 type Api = {
-  wakeSystems: (requests: SystemEntry[]) => Promise<WakeResult[]>;
+  wakeSystems: (requests: WolSystemEntry[]) => Promise<ActionResult[]>;
+  powerOnAja: (requests: AjaSystemEntry[]) => Promise<ActionResult[]>;
+  powerOffAja: (requests: AjaSystemEntry[]) => Promise<ActionResult[]>;
   checkSystemStatuses: (
-    systems: Pick<SystemEntry, "id" | "macAddress" | "ipAddress">[],
+    systems: Pick<WolSystemEntry, "id" | "macAddress" | "ipAddress">[],
   ) => Promise<SystemStatusResult[]>;
   scanLocalNetwork: () => Promise<NetworkScanResult>;
   onUpdateAvailable: (cb: () => void) => void;
@@ -93,12 +111,15 @@ const DELETE_ANIMATION_MS = 420;
 const systemModal = document.getElementById(
   "system-modal",
 ) as HTMLDialogElement;
+const ajaModal = document.getElementById("aja-modal") as HTMLDialogElement;
 const logModal = document.getElementById("log-modal") as HTMLDialogElement;
 const scanModal = document.getElementById("scan-modal") as HTMLDialogElement;
 const systemModalTitle = document.getElementById("system-modal-title")!;
+const ajaModalTitle = document.getElementById("aja-modal-title")!;
 const addSystemBtn = document.getElementById(
   "add-system-btn",
 ) as HTMLButtonElement;
+const addAjaBtn = document.getElementById("add-aja-btn") as HTMLButtonElement;
 const showLogBtn = document.getElementById("show-log-btn") as HTMLButtonElement;
 const scanNetworkBtn = document.getElementById(
   "scan-network-btn",
@@ -123,17 +144,42 @@ const broadcastInput = document.getElementById(
   "broadcast-input",
 ) as HTMLInputElement;
 const portInput = document.getElementById("port-input") as HTMLInputElement;
+const ajaForm = document.getElementById("aja-form") as HTMLFormElement;
+const editingAjaIdInput = document.getElementById(
+  "editing-aja-id",
+) as HTMLInputElement;
+const ajaNameInput = document.getElementById(
+  "aja-name-input",
+) as HTMLInputElement;
+const ipmiIpInput = document.getElementById(
+  "ipmi-ip-input",
+) as HTMLInputElement;
+const ipmiUserInput = document.getElementById(
+  "ipmi-user-input",
+) as HTMLInputElement;
+const ipmiPassInput = document.getElementById(
+  "ipmi-pass-input",
+) as HTMLInputElement;
 const systemFormError = document.getElementById("system-form-error")!;
+const ajaFormError = document.getElementById("aja-form-error")!;
 const saveSystemBtn = document.getElementById(
   "save-system-btn",
 ) as HTMLButtonElement;
+const saveAjaBtn = document.getElementById("save-aja-btn") as HTMLButtonElement;
 const cancelEditBtn = document.getElementById(
   "cancel-edit-btn",
+) as HTMLButtonElement;
+const cancelAjaEditBtn = document.getElementById(
+  "cancel-aja-edit-btn",
 ) as HTMLButtonElement;
 const systemsTable = document.getElementById(
   "systems-table",
 ) as HTMLTableSectionElement;
-const emptyState = document.getElementById("empty-state")!;
+const ajaTable = document.getElementById(
+  "aja-table",
+) as HTMLTableSectionElement;
+const wolSection = document.getElementById("wol-section")!;
+const ajaSection = document.getElementById("aja-section")!;
 const logList = document.getElementById("log-list")!;
 const scanSummary = document.getElementById("scan-summary")!;
 const scanWarningReport = document.getElementById("scan-warning-report")!;
@@ -155,10 +201,63 @@ function loadSystems(): SystemEntry[] {
   if (!saved) return [];
 
   try {
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed)
+      ? parsed
+          .map(normalizeStoredSystem)
+          .filter((system): system is SystemEntry => Boolean(system))
+      : [];
   } catch {
     return [];
   }
+}
+
+function isWolSystem(system: SystemEntry): system is WolSystemEntry {
+  return system.type === "wol";
+}
+
+function isAjaSystem(system: SystemEntry): system is AjaSystemEntry {
+  return system.type === "aja-ipmi";
+}
+
+function normalizeStoredSystem(value: unknown): SystemEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const system = value as {
+    id?: unknown;
+    name?: unknown;
+    type?: string;
+    macAddress?: unknown;
+    ipAddress?: unknown;
+    broadcastAddress?: unknown;
+    port?: unknown;
+    ipmiIp?: unknown;
+    username?: unknown;
+    password?: unknown;
+  };
+
+  if (system.type === "aja-ipmi") {
+    return {
+      id: typeof system.id === "string" ? system.id : crypto.randomUUID(),
+      type: "aja-ipmi",
+      name: typeof system.name === "string" ? system.name : "",
+      ipmiIp: typeof system.ipmiIp === "string" ? system.ipmiIp : "",
+      username: typeof system.username === "string" ? system.username : "",
+      password: typeof system.password === "string" ? system.password : "",
+    };
+  }
+
+  return {
+    id: typeof system.id === "string" ? system.id : crypto.randomUUID(),
+    type: "wol",
+    name: typeof system.name === "string" ? system.name : "",
+    macAddress: typeof system.macAddress === "string" ? system.macAddress : "",
+    ipAddress: typeof system.ipAddress === "string" ? system.ipAddress : "",
+    broadcastAddress:
+      typeof system.broadcastAddress === "string"
+        ? system.broadcastAddress
+        : DEFAULT_BROADCAST,
+    port: Number(system.port) || 9,
+  };
 }
 
 function saveSystems() {
@@ -205,12 +304,27 @@ function isIpv4Address(value: string) {
   );
 }
 
-function validateSystem(
-  system: Omit<SystemEntry, "id">,
-): ValidationResult | null {
+function validateSystem(system: SystemDraft): ValidationResult | null {
   if (!system.name.trim()) {
     return { message: "Enter a system name.", fields: ["name"] };
   }
+
+  if (system.type === "aja-ipmi") {
+    if (!isIpv4Address(system.ipmiIp)) {
+      return {
+        message: "Enter a valid AJA IPMI IPv4 address.",
+        fields: ["ipmiIp"],
+      };
+    }
+    if (!system.username.trim()) {
+      return { message: "Enter the IPMI username.", fields: ["username"] };
+    }
+    if (!system.password) {
+      return { message: "Enter the IPMI password.", fields: ["password"] };
+    }
+    return null;
+  }
+
   if (!/^[0-9A-F]{12}$/.test(normalizeMac(system.macAddress))) {
     return {
       message: "Enter a valid 12-digit MAC address.",
@@ -244,23 +358,28 @@ function validateImportedSystem(value: unknown, index: number): SystemEntry {
     throw new Error(`System ${index + 1} is not valid.`);
   }
 
-  const system = value as Partial<SystemEntry>;
-  const importedSystem: SystemEntry = {
-    id:
-      typeof system.id === "string" && system.id
-        ? system.id
-        : crypto.randomUUID(),
-    name: typeof system.name === "string" ? system.name.trim() : "",
-    macAddress:
-      typeof system.macAddress === "string" ? formatMac(system.macAddress) : "",
-    ipAddress:
-      typeof system.ipAddress === "string" ? system.ipAddress.trim() : "",
-    broadcastAddress:
-      typeof system.broadcastAddress === "string"
-        ? system.broadcastAddress.trim()
-        : "",
-    port: Number(system.port),
-  };
+  const normalized = normalizeStoredSystem(value);
+  if (!normalized) {
+    throw new Error(`System ${index + 1} is not valid.`);
+  }
+
+  const importedSystem =
+    normalized.type === "aja-ipmi"
+      ? {
+          ...normalized,
+          name: normalized.name.trim(),
+          ipmiIp: normalized.ipmiIp.trim(),
+          username: normalized.username.trim(),
+        }
+      : {
+          ...normalized,
+          name: normalized.name.trim(),
+          macAddress: formatMac(normalized.macAddress),
+          ipAddress: normalized.ipAddress?.trim() || undefined,
+          broadcastAddress: normalized.broadcastAddress.trim(),
+          port: Number(normalized.port),
+        };
+
   const validationError = validateSystem(importedSystem);
 
   if (validationError) {
@@ -283,13 +402,24 @@ function getImportedSystems(value: unknown): SystemEntry[] {
   return systemsValue.map(validateImportedSystem);
 }
 
-function getFormSystem(): Omit<SystemEntry, "id"> {
+function getFormSystem(): SystemDraft {
   return {
+    type: "wol",
     name: nameInput.value.trim(),
     macAddress: formatMac(macInput.value),
     ipAddress: ipInput.value.trim() || undefined,
     broadcastAddress: broadcastInput.value.trim(),
     port: Number(portInput.value),
+  };
+}
+
+function getAjaFormSystem(): Omit<AjaSystemEntry, "id"> {
+  return {
+    type: "aja-ipmi",
+    name: ajaNameInput.value.trim(),
+    ipmiIp: ipmiIpInput.value.trim(),
+    username: ipmiUserInput.value.trim(),
+    password: ipmiPassInput.value,
   };
 }
 
@@ -300,6 +430,22 @@ function getSystemFieldInput(field: SystemField) {
     ipAddress: ipInput,
     broadcastAddress: broadcastInput,
     port: portInput,
+    ipmiIp: ipmiIpInput,
+    username: ipmiUserInput,
+    password: ipmiPassInput,
+  }[field];
+}
+
+function getAjaFieldInput(field: SystemField) {
+  return {
+    name: ajaNameInput,
+    macAddress: ajaNameInput,
+    ipAddress: ipmiIpInput,
+    broadcastAddress: ipmiIpInput,
+    port: ipmiIpInput,
+    ipmiIp: ipmiIpInput,
+    username: ipmiUserInput,
+    password: ipmiPassInput,
   }[field];
 }
 
@@ -308,6 +454,18 @@ function clearSystemFormValidation() {
   systemFormError.textContent = "";
 
   ([nameInput, macInput, ipInput, broadcastInput, portInput] as const).forEach(
+    (input) => {
+      input.classList.remove("input-error");
+      input.removeAttribute("aria-invalid");
+    },
+  );
+}
+
+function clearAjaFormValidation() {
+  ajaFormError.classList.add("hidden");
+  ajaFormError.textContent = "";
+
+  ([ajaNameInput, ipmiIpInput, ipmiUserInput, ipmiPassInput] as const).forEach(
     (input) => {
       input.classList.remove("input-error");
       input.removeAttribute("aria-invalid");
@@ -329,6 +487,20 @@ function showSystemFormValidationError(validationError: ValidationResult) {
   getSystemFieldInput(validationError.fields[0]).focus();
 }
 
+function showAjaFormValidationError(validationError: ValidationResult) {
+  clearAjaFormValidation();
+  ajaFormError.textContent = validationError.message;
+  ajaFormError.classList.remove("hidden");
+
+  validationError.fields.forEach((field) => {
+    const input = getAjaFieldInput(field);
+    input.classList.add("input-error");
+    input.setAttribute("aria-invalid", "true");
+  });
+
+  getAjaFieldInput(validationError.fields[0]).focus();
+}
+
 function resetForm() {
   editingIdInput.value = "";
   nameInput.value = "";
@@ -343,6 +515,19 @@ function resetForm() {
   clearSystemFormValidation();
 }
 
+function resetAjaForm() {
+  editingAjaIdInput.value = "";
+  ajaNameInput.value = "";
+  ipmiIpInput.value = "";
+  ipmiUserInput.value = "ADMIN";
+  ipmiPassInput.value = "";
+  ajaModalTitle.textContent = "Add AJA Bridge Live";
+  saveAjaBtn.textContent = "Add AJA";
+  saveAjaBtn.disabled = false;
+  cancelAjaEditBtn.disabled = false;
+  clearAjaFormValidation();
+}
+
 function openSystemModal() {
   systemModal.showModal();
   requestAnimationFrame(() => nameInput.focus());
@@ -351,6 +536,16 @@ function openSystemModal() {
 function closeSystemModal() {
   systemModal.close();
   resetForm();
+}
+
+function openAjaModal() {
+  ajaModal.showModal();
+  requestAnimationFrame(() => ajaNameInput.focus());
+}
+
+function closeAjaModal() {
+  ajaModal.close();
+  resetAjaForm();
 }
 
 function showAlert(
@@ -376,8 +571,65 @@ function showAlert(
 
 function render() {
   systemsTable.innerHTML = "";
+  ajaTable.innerHTML = "";
 
-  for (const [index, system] of systems.entries()) {
+  const ajaSystems = systems.filter(isAjaSystem);
+  const wolSystems = systems.filter(isWolSystem);
+
+  ajaSection.classList.toggle("hidden", ajaSystems.length === 0);
+  wolSection.classList.toggle("hidden", wolSystems.length === 0);
+
+  for (const [index, system] of ajaSystems.entries()) {
+    const tr = document.createElement("tr");
+    tr.className = "transition-all duration-500 ease-out";
+    tr.dataset.id = system.id;
+    tr.innerHTML = `
+            <td class="text-base-content/60">${index + 1}</td>
+            <td class="font-semibold">${escapeHtml(system.name)}</td>
+            <td class="font-mono">${escapeHtml(system.ipmiIp)}</td>
+            <td>${escapeHtml(system.username)}</td>
+            <td>
+                <div class="flex justify-end gap-2">
+                    <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
+                            <path d="m20 6-11 11-5-5" />
+                        </svg>
+                    </span>
+                    <span class="flex gap-0.5">
+                        <button class="btn btn-square btn-ghost btn-xs move-up" data-id="${system.id}" title="Move up" aria-label="Move up" ${index === 0 ? "disabled" : ""}>
+                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="m18 15-6-6-6 6" />
+                            </svg>
+                        </button>
+                        <button class="btn btn-square btn-ghost btn-xs move-down" data-id="${system.id}" title="Move down" aria-label="Move down" ${index === ajaSystems.length - 1 ? "disabled" : ""}>
+                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                    </span>
+                    <button class="btn btn-primary btn-xs power-on-aja" data-id="${system.id}">Power On</button>
+                    <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Power Off</button>
+                    <button class="btn btn-square btn-outline btn-xs edit-aja" data-id="${system.id}" title="Edit" aria-label="Edit">
+                        <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
+                        </svg>
+                    </button>
+                    <button class="btn btn-square btn-error btn-xs delete-one" data-id="${system.id}" title="Delete" aria-label="Delete">
+                        <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M3 6h18" />
+                            <path d="M8 6V4h8v2" />
+                            <path d="M19 6l-1 14H6L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                        </svg>
+                    </button>
+                </div>
+            </td>
+        `;
+    ajaTable.appendChild(tr);
+  }
+
+  for (const [index, system] of wolSystems.entries()) {
     const status = systemStatuses.get(system.id);
     const macStatus = status?.macStatus ?? "unknown";
     const ipStatus = status?.ipStatus ?? "unknown";
@@ -412,8 +664,7 @@ function render() {
                     }
                 </div>
             </td>
-            <td class="font-mono">${escapeHtml(system.broadcastAddress)}</td>
-            <td>${system.port}</td>
+            <td class="font-mono">${escapeHtml(`${system.broadcastAddress}:${system.port}`)}</td>
             <td>
                 <div class="flex justify-end gap-2">
                     <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
@@ -453,8 +704,6 @@ function render() {
         `;
     systemsTable.appendChild(tr);
   }
-
-  emptyState.classList.toggle("hidden", systems.length > 0);
 }
 
 function getStatusDotBaseClass(status: SystemStatus) {
@@ -472,7 +721,7 @@ function getMacStatusDotClass(status: SystemStatus) {
   return getStatusDotBaseClass(status);
 }
 
-function getIpStatusDotClass(status: SystemStatus, system: SystemEntry) {
+function getIpStatusDotClass(status: SystemStatus, system: WolSystemEntry) {
   if (!system.ipAddress) {
     return "invisible block h-3 w-3 shrink-0 rounded-full";
   }
@@ -487,7 +736,7 @@ function getMacStatusText(status: SystemStatus) {
   return "MAC status unknown";
 }
 
-function getIpStatusText(status: SystemStatus, system: SystemEntry) {
+function getIpStatusText(status: SystemStatus, system: WolSystemEntry) {
   if (!system.ipAddress) return "No IP address set";
   if (status === "checking") return "Checking status";
   if (status === "online") return "Online";
@@ -499,7 +748,7 @@ function getMappingWarnings(
   system: SystemEntry,
   status: SystemStatusResult | undefined,
 ) {
-  if (!status) return [];
+  if (!status || !isWolSystem(system)) return [];
 
   const warnings: string[] = [];
   const normalizedMac = normalizeMac(system.macAddress);
@@ -526,11 +775,13 @@ function getMappingWarnings(
 function isScanDeviceAdded(device: NetworkScanDevice) {
   const normalizedDeviceMac = normalizeMac(device.macAddress);
 
-  return systems.some(
-    (system) =>
-      normalizeMac(system.macAddress) === normalizedDeviceMac &&
-      system.ipAddress === device.ipAddress,
-  );
+  return systems
+    .filter(isWolSystem)
+    .some(
+      (system) =>
+        normalizeMac(system.macAddress) === normalizedDeviceMac &&
+        system.ipAddress === device.ipAddress,
+    );
 }
 
 function getBroadcastAddress(ipAddress: string) {
@@ -624,7 +875,7 @@ function renderLog() {
   }
 }
 
-function addLog(result: WakeResult) {
+function addLog(result: ActionResult) {
   logEntries = [
     {
       ...result,
@@ -660,15 +911,30 @@ function showWakeSuccess(button: HTMLButtonElement) {
 }
 
 function moveSystem(id: string, direction: -1 | 1) {
-  const currentIndex = systems.findIndex((system) => system.id === id);
-  const nextIndex = currentIndex + direction;
+  const system = systems.find((entry) => entry.id === id);
+  if (!system) return;
 
-  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= systems.length) {
+  const matchingSystems = systems.filter((entry) => entry.type === system.type);
+  const currentTypeIndex = matchingSystems.findIndex(
+    (entry) => entry.id === id,
+  );
+  const nextTypeIndex = currentTypeIndex + direction;
+
+  if (
+    currentTypeIndex < 0 ||
+    nextTypeIndex < 0 ||
+    nextTypeIndex >= matchingSystems.length
+  ) {
     return;
   }
 
-  const [system] = systems.splice(currentIndex, 1);
-  systems.splice(nextIndex, 0, system);
+  const swapWithId = matchingSystems[nextTypeIndex].id;
+  const currentIndex = systems.findIndex((entry) => entry.id === id);
+  const swapIndex = systems.findIndex((entry) => entry.id === swapWithId);
+  [systems[currentIndex], systems[swapIndex]] = [
+    systems[swapIndex],
+    systems[currentIndex],
+  ];
   saveSystems();
   render();
 }
@@ -741,7 +1007,7 @@ async function scanLocalNetwork() {
 }
 
 async function wakeEntries(
-  entries: SystemEntry[],
+  entries: WolSystemEntry[],
   wakeButtons: HTMLButtonElement[] = [],
 ) {
   if (entries.length === 0) {
@@ -774,6 +1040,43 @@ async function wakeEntries(
   }
 }
 
+async function powerAjaEntries(
+  entries: AjaSystemEntry[],
+  action: "on" | "off",
+  powerButtons: HTMLButtonElement[] = [],
+) {
+  if (entries.length === 0) {
+    showAlert("Add an AJA IPMI device first.", "error");
+    return;
+  }
+
+  powerButtons.forEach((button) => (button.disabled = true));
+  try {
+    const results =
+      action === "on"
+        ? await window.api.powerOnAja(entries)
+        : await window.api.powerOffAja(entries);
+    results.forEach(addLog);
+    const failures = results.filter((result) => !result.ok);
+
+    if (failures.length === 0 && powerButtons.length > 0) {
+      powerButtons.forEach(showWakeSuccess);
+      return;
+    }
+
+    showAlert(
+      failures.length === 0
+        ? `Sent AJA ${action === "on" ? "power-on" : "power-off"} command to ${results.length} device(s).`
+        : `Sent ${results.length - failures.length}, failed ${failures.length}.`,
+      failures.length === 0 ? "success" : "error",
+    );
+  } catch (err) {
+    showAlert(err instanceof Error ? err.message : String(err), "error");
+  } finally {
+    powerButtons.forEach((button) => (button.disabled = false));
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   const formSystem = getFormSystem();
@@ -799,9 +1102,37 @@ form.addEventListener("submit", (event) => {
   refreshStatuses();
 });
 
+ajaForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const formSystem = getAjaFormSystem();
+  const validationError = validateSystem(formSystem);
+  if (validationError) {
+    showAjaFormValidationError(validationError);
+    return;
+  }
+
+  const editingId = editingAjaIdInput.value;
+  if (editingId) {
+    systems = systems.map((system) =>
+      system.id === editingId ? { ...formSystem, id: editingId } : system,
+    );
+  } else {
+    const id = crypto.randomUUID();
+    systems.push({ ...formSystem, id });
+  }
+
+  saveSystems();
+  closeAjaModal();
+  render();
+});
+
 addSystemBtn.addEventListener("click", () => {
   resetForm();
   openSystemModal();
+});
+addAjaBtn.addEventListener("click", () => {
+  resetAjaForm();
+  openAjaModal();
 });
 showLogBtn.addEventListener("click", () => logModal.showModal());
 scanNetworkBtn.addEventListener("click", scanLocalNetwork);
@@ -816,9 +1147,15 @@ importSettingsInput.addEventListener("change", () => {
 ([nameInput, macInput, ipInput, broadcastInput, portInput] as const).forEach(
   (input) => input.addEventListener("input", clearSystemFormValidation),
 );
+([ajaNameInput, ipmiIpInput, ipmiUserInput, ipmiPassInput] as const).forEach(
+  (input) => input.addEventListener("input", clearAjaFormValidation),
+);
 cancelEditBtn.addEventListener("click", closeSystemModal);
+cancelAjaEditBtn.addEventListener("click", closeAjaModal);
 systemModal.addEventListener("cancel", () => resetForm());
 systemModal.addEventListener("close", () => resetForm());
+ajaModal.addEventListener("cancel", () => resetAjaForm());
+ajaModal.addEventListener("close", () => resetAjaForm());
 
 scanTable.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
@@ -857,11 +1194,11 @@ systemsTable.addEventListener("click", (event) => {
     moveSystem(id, 1);
   }
 
-  if (button.classList.contains("wake-one")) {
+  if (button.classList.contains("wake-one") && isWolSystem(system)) {
     wakeEntries([system], [button as HTMLButtonElement]);
   }
 
-  if (button.classList.contains("edit-one")) {
+  if (button.classList.contains("edit-one") && isWolSystem(system)) {
     editingIdInput.value = system.id;
     nameInput.value = system.name;
     macInput.value = system.macAddress;
@@ -898,6 +1235,66 @@ systemsTable.addEventListener("click", (event) => {
   }
 });
 
+ajaTable.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const button = target.closest("button");
+  if (!button) return;
+
+  const id = button.dataset.id;
+  const system = systems.find((entry) => entry.id === id);
+  if (!id || !system || !isAjaSystem(system)) return;
+
+  if (button.classList.contains("move-up")) {
+    moveSystem(id, -1);
+  }
+
+  if (button.classList.contains("move-down")) {
+    moveSystem(id, 1);
+  }
+
+  if (button.classList.contains("power-on-aja")) {
+    powerAjaEntries([system], "on", [button as HTMLButtonElement]);
+  }
+
+  if (button.classList.contains("power-off-aja")) {
+    powerAjaEntries([system], "off", [button as HTMLButtonElement]);
+  }
+
+  if (button.classList.contains("edit-aja")) {
+    editingAjaIdInput.value = system.id;
+    ajaNameInput.value = system.name;
+    ipmiIpInput.value = system.ipmiIp;
+    ipmiUserInput.value = system.username;
+    ipmiPassInput.value = system.password;
+    ajaModalTitle.textContent = "Edit AJA Bridge Live";
+    saveAjaBtn.textContent = "Save Changes";
+    openAjaModal();
+  }
+
+  if (button.classList.contains("delete-one")) {
+    const confirmed = confirm(`Delete ${system.name}?`);
+    if (!confirmed) return;
+
+    const row = button.closest("tr") as HTMLTableRowElement | null;
+    const removeSystem = () => {
+      systems = systems.filter((entry) => entry.id !== id);
+      saveSystems();
+      render();
+    };
+
+    if (!row) {
+      removeSystem();
+      return;
+    }
+
+    row.querySelectorAll("button").forEach((rowButton) => {
+      rowButton.disabled = true;
+    });
+    row.classList.add("system-row-removing");
+    window.setTimeout(removeSystem, DELETE_ANIMATION_MS);
+  }
+});
+
 document.getElementById("clear-log-btn")!.addEventListener("click", () => {
   logEntries = [];
   saveLogs();
@@ -907,14 +1304,16 @@ document.getElementById("clear-log-btn")!.addEventListener("click", () => {
 async function refreshStatuses(showResultAlert = false): Promise<string[]> {
   if (statusCheckInProgress) return [];
 
-  if (systems.length === 0) {
+  const wolSystems = systems.filter(isWolSystem);
+
+  if (wolSystems.length === 0) {
     systemStatuses.clear();
     render();
     return [];
   }
 
   statusCheckInProgress = true;
-  systems.forEach((system) => {
+  wolSystems.forEach((system) => {
     const currentStatus = systemStatuses.get(system.id);
     systemStatuses.set(system.id, {
       id: system.id,
@@ -928,7 +1327,7 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
 
   try {
     const results = await window.api.checkSystemStatuses(
-      systems.map(({ id, macAddress, ipAddress }) => ({
+      wolSystems.map(({ id, macAddress, ipAddress }) => ({
         id,
         macAddress,
         ipAddress,
@@ -951,7 +1350,7 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
 
     return warningDetails;
   } catch {
-    systems.forEach((system) =>
+    wolSystems.forEach((system) =>
       systemStatuses.set(system.id, {
         id: system.id,
         ipStatus: "unknown",
@@ -1069,6 +1468,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 resetForm();
+resetAjaForm();
 render();
 renderLog();
 refreshStatuses();

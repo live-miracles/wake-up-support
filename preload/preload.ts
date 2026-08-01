@@ -7,6 +7,13 @@ type WakeRequest = {
   port: number;
 };
 
+type AjaPowerRequest = {
+  name: string;
+  ipmiIp: string;
+  username: string;
+  password: string;
+};
+
 type SystemStatusRequest = {
   id: string;
   macAddress: string;
@@ -16,6 +23,10 @@ type SystemStatusRequest = {
 contextBridge.exposeInMainWorld("api", {
   wakeSystems: (requests: WakeRequest[]) =>
     ipcRenderer.invoke("wake-systems", requests),
+  powerOnAja: (requests: AjaPowerRequest[]) =>
+    ipcRenderer.invoke("power-on-aja", requests),
+  powerOffAja: (requests: AjaPowerRequest[]) =>
+    ipcRenderer.invoke("power-off-aja", requests),
   checkSystemStatuses: (systems: SystemStatusRequest[]) =>
     ipcRenderer.invoke("check-system-statuses", systems),
   scanLocalNetwork: () => ipcRenderer.invoke("scan-local-network"),

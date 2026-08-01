@@ -6,6 +6,11 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 
 import updater from "electron-updater";
+import {
+  powerOffAjaBridge,
+  powerOnAjaBridge,
+  type AjaPowerRequest,
+} from "./aja-ipmi.js";
 import { sendWakeOnLan, type WakeRequest } from "./wake-on-lan.js";
 
 const { autoUpdater } = updater;
@@ -63,6 +68,14 @@ app.whenReady().then(() => {
 
 ipcMain.handle("wake-systems", async (_, requests: WakeRequest[]) => {
   return Promise.all(requests.map((request) => sendWakeOnLan(request)));
+});
+
+ipcMain.handle("power-on-aja", async (_, requests: AjaPowerRequest[]) => {
+  return Promise.all(requests.map((request) => powerOnAjaBridge(request)));
+});
+
+ipcMain.handle("power-off-aja", async (_, requests: AjaPowerRequest[]) => {
+  return Promise.all(requests.map((request) => powerOffAjaBridge(request)));
 });
 
 ipcMain.handle(

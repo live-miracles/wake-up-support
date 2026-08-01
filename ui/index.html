@@ -95,7 +95,6 @@
                 class="input w-full font-mono"
                 placeholder="AA-BB-CC-DD-EE-FF"
                 autocomplete="off"
-                required
               />
             </fieldset>
           </div>
@@ -117,7 +116,6 @@
                 id="broadcast-input"
                 class="input w-full font-mono"
                 placeholder="192.168.154.255"
-                required
               />
             </fieldset>
             <fieldset class="fieldset">
@@ -129,16 +127,13 @@
                 min="1"
                 max="65535"
                 value="9"
-                required
               />
             </fieldset>
           </div>
 
           <p class="text-sm text-base-content/70">
-            Wake-on-LAN also needs to be enabled in BIOS/UEFI and the Windows
-            network adapter settings for each target system. On some systems,
-            such as Dell machines, Deep Sleep Control also need to be disabled
-            so the LAN card keeps power while shut down.
+            Wake-on-LAN also needs to be enabled in BIOS/UEFI and network
+            adapter settings for each target system.
           </p>
 
           <p id="system-form-error" class="hidden text-sm text-error"></p>
@@ -149,6 +144,83 @@
             </button>
             <button id="save-system-btn" class="btn btn-primary" type="submit">
               Add System
+            </button>
+          </div>
+        </form>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
+
+    <dialog id="aja-modal" class="modal">
+      <div class="modal-box max-w-xl">
+        <div class="mb-4">
+          <h2 id="aja-modal-title" class="text-xl font-semibold">
+            Add AJA Bridge Live
+          </h2>
+          <p class="mt-1 text-sm text-base-content/70">
+            Use the IPMI management IP address and credentials from the AJA
+            unit.
+          </p>
+        </div>
+
+        <form id="aja-form" class="space-y-3" novalidate>
+          <input id="editing-aja-id" type="hidden" />
+          <div class="grid gap-3 md:grid-cols-2">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Device name</legend>
+              <input
+                id="aja-name-input"
+                class="input w-full"
+                placeholder="AJA Bridge Live 1"
+                autocomplete="off"
+              />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">AJA IPMI IP address</legend>
+              <input
+                id="ipmi-ip-input"
+                class="input w-full font-mono"
+                placeholder="192.168.1.50"
+                autocomplete="off"
+              />
+            </fieldset>
+          </div>
+          <div class="grid gap-3 md:grid-cols-2">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">IPMI username</legend>
+              <input
+                id="ipmi-user-input"
+                class="input w-full"
+                placeholder="ADMIN"
+                autocomplete="off"
+              />
+            </fieldset>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">IPMI password</legend>
+              <input
+                id="ipmi-pass-input"
+                class="input w-full"
+                type="password"
+                autocomplete="off"
+              />
+            </fieldset>
+          </div>
+          <p class="text-sm text-base-content/70">
+            AJA power control uses IPMI, not Wake-on-LAN. The app uses its
+            bundled ipmiutil.exe automatically. Passwords are saved on this
+            computer with the rest of the app settings.
+          </p>
+
+          <p id="aja-form-error" class="hidden text-sm text-error"></p>
+
+          <div class="modal-action">
+            <button id="cancel-aja-edit-btn" class="btn" type="button">
+              Cancel
+            </button>
+            <button id="save-aja-btn" class="btn btn-primary" type="submit">
+              Add AJA
             </button>
           </div>
         </form>
@@ -314,9 +386,9 @@
             </button>
             <button
               id="add-system-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Add system"
-              aria-label="Add system"
+              class="btn btn-outline btn-sm"
+              title="Add Wake-on-LAN system"
+              aria-label="Add Wake-on-LAN system"
             >
               <svg
                 aria-hidden="true"
@@ -331,6 +403,27 @@
                 <path d="M12 5v14" />
                 <path d="M5 12h14" />
               </svg>
+              WOL
+            </button>
+            <button
+              id="add-aja-btn"
+              class="btn btn-outline btn-sm"
+              title="Add AJA Bridge Live"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              ABL
             </button>
             <input
               id="import-settings-input"
@@ -343,28 +436,42 @@
       </header>
 
       <section class="min-h-0 flex-1 overflow-y-auto p-4">
-        <div
-          class="mx-auto w-full max-w-7xl overflow-x-auto rounded border border-base-300"
-        >
-          <table class="table table-zebra table-sm">
-            <thead>
-              <tr>
-                <th class="w-12">#</th>
-                <th>Name</th>
-                <th>MAC Address</th>
-                <th>IP Address</th>
-                <th>Broadcast</th>
-                <th class="w-24">Port</th>
-                <th class="w-64"></th>
-              </tr>
-            </thead>
-            <tbody id="systems-table"></tbody>
-          </table>
-          <div
-            id="empty-state"
-            class="hidden p-8 text-center text-base-content/70"
-          >
-            Add your first system to start sending Wake-on-LAN packets.
+        <div class="mx-auto flex w-full max-w-7xl flex-col gap-5">
+          <div id="aja-section">
+            <h2 class="mb-2 text-lg font-semibold">AJA Bridge Live Devices</h2>
+            <div class="overflow-x-auto rounded border border-base-300">
+              <table class="table table-zebra table-sm">
+                <thead>
+                  <tr>
+                    <th class="w-12">#</th>
+                    <th>Name</th>
+                    <th>IPMI IP Address</th>
+                    <th>Username</th>
+                    <th class="w-72"></th>
+                  </tr>
+                </thead>
+                <tbody id="aja-table"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="wol-section">
+            <h2 class="mb-2 text-lg font-semibold">Wake-on-LAN Systems</h2>
+            <div class="overflow-x-auto rounded border border-base-300">
+              <table class="table table-zebra table-sm">
+                <thead>
+                  <tr>
+                    <th class="w-12">#</th>
+                    <th>Name</th>
+                    <th>MAC Address</th>
+                    <th>IP Address</th>
+                    <th>Broadcast:Port</th>
+                    <th class="w-64"></th>
+                  </tr>
+                </thead>
+                <tbody id="systems-table"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>

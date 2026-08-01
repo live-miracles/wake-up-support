@@ -32,6 +32,15 @@
       "dist/**/*",
       "ui/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "tools",
+        "to": "tools",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "ui/logo.ico"
