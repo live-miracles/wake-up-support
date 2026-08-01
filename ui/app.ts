@@ -774,7 +774,7 @@ function render() {
                             </svg>
                         </button>
                     </span>
-                    <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">Wake</button>
+                    <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">On</button>
                     <button class="btn btn-square btn-outline btn-xs edit-one" data-id="${system.id}" title="Edit" aria-label="Edit">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
