@@ -25,3 +25,15 @@ body {
     line-height 420ms ease,
     padding 420ms ease;
 }
+
+.system-row-dragging {
+  opacity: 0.45;
+}
+
+.system-row-drop-before > td {
+  border-top: 2px solid var(--color-primary);
+}
+
+.system-row-drop-after > td {
+  border-bottom: 2px solid var(--color-primary);
+}

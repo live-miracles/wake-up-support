@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("api", {
   checkSystemStatuses: (systems: SystemStatusRequest[]) =>
     ipcRenderer.invoke("check-system-statuses", systems),
   scanLocalNetwork: () => ipcRenderer.invoke("scan-local-network"),
+  openGitHub: () => ipcRenderer.send("open-github"),
 
   onUpdateAvailable: (cb: () => void) => ipcRenderer.on("update-available", cb),
   onUpdateProgress: (cb: (progress: number) => void) =>

@@ -67,6 +67,8 @@ type NetworkScanResult = {
   devices: NetworkScanDevice[];
 };
 
+type AppView = "home" | "scan" | "logs" | "docs";
+
 type SettingsExport = {
   app: "wake-up-support";
   version: 1;
@@ -104,6 +106,7 @@ type Api = {
     systems: SystemStatusRequest[],
   ) => Promise<SystemStatusResult[]>;
   scanLocalNetwork: () => Promise<NetworkScanResult>;
+  openGitHub: () => void;
   onUpdateAvailable: (cb: () => void) => void;
   onUpdateProgress: (cb: (progress: number) => void) => void;
   onUpdateReady: (cb: () => void) => void;
@@ -123,6 +126,7 @@ declare global {
 
 const SYSTEMS_STORAGE_KEY = "wake-up-support.systems";
 const LOGS_STORAGE_KEY = "wake-up-support.logs";
+const SCAN_REPORT_STORAGE_KEY = "wake-up-support.scan-report";
 const DEFAULT_BROADCAST = "192.168.154.255";
 const MAX_LOG_ENTRIES = 300;
 const DELETE_ANIMATION_MS = 420;
@@ -131,17 +135,23 @@ const systemModal = document.getElementById(
   "system-modal",
 ) as HTMLDialogElement;
 const ajaModal = document.getElementById("aja-modal") as HTMLDialogElement;
-const logModal = document.getElementById("log-modal") as HTMLDialogElement;
-const scanModal = document.getElementById("scan-modal") as HTMLDialogElement;
 const powerOffConfirmModal = document.getElementById(
   "power-off-confirm-modal",
 ) as HTMLDialogElement;
 const deleteConfirmModal = document.getElementById(
   "delete-confirm-modal",
 ) as HTMLDialogElement;
-const docsModal = document.getElementById("docs-modal") as HTMLDialogElement;
 const systemModalTitle = document.getElementById("system-modal-title")!;
 const ajaModalTitle = document.getElementById("aja-modal-title")!;
+const homeViewBtn = document.getElementById(
+  "home-view-btn",
+) as HTMLButtonElement;
+const openGitHubBtn = document.getElementById(
+  "open-github-btn",
+) as HTMLButtonElement;
+const showHomeBtn = document.getElementById(
+  "show-home-btn",
+) as HTMLButtonElement;
 const showDocsBtn = document.getElementById(
   "show-docs-btn",
 ) as HTMLButtonElement;
@@ -211,6 +221,10 @@ const systemsTable = document.getElementById(
 const ajaTable = document.getElementById(
   "aja-table",
 ) as HTMLTableSectionElement;
+const homeView = document.getElementById("home-view")!;
+const scanView = document.getElementById("scan-view")!;
+const logsView = document.getElementById("logs-view")!;
+const docsView = document.getElementById("docs-view")!;
 const wolSection = document.getElementById("wol-section")!;
 const ajaSection = document.getElementById("aja-section")!;
 const logList = document.getElementById("log-list")!;
@@ -220,6 +234,9 @@ const scanTable = document.getElementById(
   "scan-table",
 ) as HTMLTableSectionElement;
 const scanEmptyState = document.getElementById("scan-empty-state")!;
+const refreshScanBtn = document.getElementById(
+  "refresh-scan-btn",
+) as HTMLButtonElement;
 const alertBox = document.getElementById("alert")!;
 const alertText = document.getElementById("alert-text")!;
 const powerOffConfirmText = document.getElementById("power-off-confirm-text")!;
@@ -227,10 +244,14 @@ const deleteConfirmText = document.getElementById("delete-confirm-text")!;
 
 let systems = loadSystems();
 let logEntries: LogEntry[] = loadLogs();
+let latestScanReport = loadScanReport();
 const systemStatuses = new Map<string, SystemStatusResult>();
 const ajaStatuses = new Map<string, AjaPowerStatusResult>();
 const successTimers = new WeakMap<HTMLElement, number>();
 let statusCheckInProgress = false;
+let draggedSystemId: string | null = null;
+let draggedSystemType: SystemEntry["type"] | null = null;
+let activeView: AppView = "home";
 
 function loadSystems(): SystemEntry[] {
   const saved = localStorage.getItem(SYSTEMS_STORAGE_KEY);
@@ -336,6 +357,54 @@ function saveLogs() {
   localStorage.setItem(
     LOGS_STORAGE_KEY,
     JSON.stringify(logEntries.slice(0, MAX_LOG_ENTRIES)),
+  );
+}
+
+function loadScanReport(): NetworkScanResult | null {
+  const saved = localStorage.getItem(SCAN_REPORT_STORAGE_KEY);
+  if (!saved) return null;
+
+  try {
+    const parsed = JSON.parse(saved) as Partial<NetworkScanResult>;
+    if (
+      typeof parsed.localIp !== "string" ||
+      typeof parsed.subnet !== "string" ||
+      !Array.isArray(parsed.devices)
+    ) {
+      return null;
+    }
+
+    return {
+      localIp: parsed.localIp,
+      subnet: parsed.subnet,
+      devices: parsed.devices
+        .filter((device): device is NetworkScanDevice =>
+          Boolean(
+            device &&
+            typeof device.ipAddress === "string" &&
+            typeof device.macAddress === "string",
+          ),
+        )
+        .map((device) => ({
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          name: typeof device.name === "string" ? device.name : undefined,
+        })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveScanReport() {
+  if (!latestScanReport) {
+    localStorage.removeItem(SCAN_REPORT_STORAGE_KEY);
+    return;
+  }
+
+  localStorage.setItem(
+    SCAN_REPORT_STORAGE_KEY,
+    JSON.stringify(latestScanReport),
   );
 }
 
@@ -662,6 +731,18 @@ function render() {
     tr.className = "transition-all duration-500 ease-out";
     tr.dataset.id = system.id;
     tr.innerHTML = `
+            <td>
+                <button class="drag-handle btn btn-square btn-ghost btn-xs cursor-grab active:cursor-grabbing" data-id="${system.id}" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">
+                    <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="9" cy="6" r="1" />
+                        <circle cx="9" cy="12" r="1" />
+                        <circle cx="9" cy="18" r="1" />
+                        <circle cx="15" cy="6" r="1" />
+                        <circle cx="15" cy="12" r="1" />
+                        <circle cx="15" cy="18" r="1" />
+                    </svg>
+                </button>
+            </td>
             <td class="text-base-content/60">${index + 1}</td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td>
@@ -684,18 +765,6 @@ function render() {
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
                             <path d="m20 6-11 11-5-5" />
                         </svg>
-                    </span>
-                    <span class="flex gap-0.5">
-                        <button class="btn btn-square btn-ghost btn-xs move-up" data-id="${system.id}" title="Move up" aria-label="Move up" ${index === 0 ? "disabled" : ""}>
-                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-                                <path d="m18 15-6-6-6 6" />
-                            </svg>
-                        </button>
-                        <button class="btn btn-square btn-ghost btn-xs move-down" data-id="${system.id}" title="Move down" aria-label="Move down" ${index === ajaSystems.length - 1 ? "disabled" : ""}>
-                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
                     </span>
                     <button class="btn btn-primary btn-xs power-on-aja" data-id="${system.id}">On</button>
                     <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Off</button>
@@ -730,6 +799,18 @@ function render() {
     tr.className = "transition-all duration-500 ease-out";
     tr.dataset.id = system.id;
     tr.innerHTML = `
+            <td>
+                <button class="drag-handle btn btn-square btn-ghost btn-xs cursor-grab active:cursor-grabbing" data-id="${system.id}" draggable="true" title="Drag to reorder" aria-label="Drag to reorder">
+                    <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                        <circle cx="9" cy="6" r="1" />
+                        <circle cx="9" cy="12" r="1" />
+                        <circle cx="9" cy="18" r="1" />
+                        <circle cx="15" cy="6" r="1" />
+                        <circle cx="15" cy="12" r="1" />
+                        <circle cx="15" cy="18" r="1" />
+                    </svg>
+                </button>
+            </td>
             <td class="text-base-content/60">${index + 1}</td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td>
@@ -761,18 +842,6 @@ function render() {
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
                             <path d="m20 6-11 11-5-5" />
                         </svg>
-                    </span>
-                    <span class="flex gap-0.5">
-                        <button class="btn btn-square btn-ghost btn-xs move-up" data-id="${system.id}" title="Move up" aria-label="Move up" ${index === 0 ? "disabled" : ""}>
-                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-                                <path d="m18 15-6-6-6 6" />
-                            </svg>
-                        </button>
-                        <button class="btn btn-square btn-ghost btn-xs move-down" data-id="${system.id}" title="Move down" aria-label="Move down" ${index === systems.length - 1 ? "disabled" : ""}>
-                            <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
-                                <path d="m6 9 6 6 6-6" />
-                            </svg>
-                        </button>
                     </span>
                     <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">On</button>
                     <button class="btn btn-square btn-outline btn-xs edit-one" data-id="${system.id}" title="Edit" aria-label="Edit">
@@ -922,6 +991,32 @@ function getBroadcastAddress(ipAddress: string) {
     : DEFAULT_BROADCAST;
 }
 
+function showView(view: AppView) {
+  activeView = view;
+  homeView.classList.toggle("hidden", view !== "home");
+  scanView.classList.toggle("hidden", view !== "scan");
+  logsView.classList.toggle("hidden", view !== "logs");
+  docsView.classList.toggle("hidden", view !== "docs");
+
+  if (view === "scan") renderLatestScanReport();
+}
+
+function renderLatestScanReport() {
+  if (!latestScanReport) {
+    scanSummary.textContent = "No scan report yet.";
+    scanWarningReport.classList.add("hidden");
+    scanWarningReport.innerHTML = "";
+    scanTable.innerHTML = "";
+    scanEmptyState.textContent =
+      "No scan report yet. Refresh to scan the local subnet.";
+    scanEmptyState.classList.remove("hidden");
+    return;
+  }
+
+  renderScanResults(latestScanReport);
+  renderScanWarnings(getCurrentMappingWarnings());
+}
+
 function renderScanResults(result: NetworkScanResult) {
   scanSummary.textContent = `Local IP ${result.localIp}, scanned ${result.subnet}. Found ${result.devices.length} device(s).`;
   scanTable.innerHTML = "";
@@ -946,7 +1041,12 @@ function renderScanResults(result: NetworkScanResult) {
     scanTable.appendChild(tr);
   }
 
+  scanEmptyState.textContent = "No devices found on this subnet.";
   scanEmptyState.classList.toggle("hidden", result.devices.length > 0);
+}
+
+function getCurrentMappingWarnings() {
+  return getMappingWarningDetails([...systemStatuses.values()]);
 }
 
 function renderScanWarnings(warnings: string[]) {
@@ -1041,33 +1141,158 @@ function showWakeSuccess(button: HTMLButtonElement) {
   if (successIcon) showInlineSuccess(successIcon);
 }
 
-function moveSystem(id: string, direction: -1 | 1) {
-  const system = systems.find((entry) => entry.id === id);
-  if (!system) return;
+function reorderSystemWithinType(
+  draggedId: string,
+  targetId: string,
+  type: SystemEntry["type"],
+  position: "before" | "after",
+) {
+  if (draggedId === targetId) return;
 
-  const matchingSystems = systems.filter((entry) => entry.type === system.type);
-  const currentTypeIndex = matchingSystems.findIndex(
-    (entry) => entry.id === id,
+  const sameTypeSystems = systems.filter((entry) => entry.type === type);
+  const draggedIndex = sameTypeSystems.findIndex(
+    (entry) => entry.id === draggedId,
   );
-  const nextTypeIndex = currentTypeIndex + direction;
+  const targetIndex = sameTypeSystems.findIndex(
+    (entry) => entry.id === targetId,
+  );
 
-  if (
-    currentTypeIndex < 0 ||
-    nextTypeIndex < 0 ||
-    nextTypeIndex >= matchingSystems.length
-  ) {
-    return;
-  }
+  if (draggedIndex < 0 || targetIndex < 0) return;
 
-  const swapWithId = matchingSystems[nextTypeIndex].id;
-  const currentIndex = systems.findIndex((entry) => entry.id === id);
-  const swapIndex = systems.findIndex((entry) => entry.id === swapWithId);
-  [systems[currentIndex], systems[swapIndex]] = [
-    systems[swapIndex],
-    systems[currentIndex],
-  ];
+  const [draggedSystem] = sameTypeSystems.splice(draggedIndex, 1);
+  const adjustedTargetIndex = sameTypeSystems.findIndex(
+    (entry) => entry.id === targetId,
+  );
+  sameTypeSystems.splice(
+    position === "after" ? adjustedTargetIndex + 1 : adjustedTargetIndex,
+    0,
+    draggedSystem,
+  );
+
+  let sameTypeIndex = 0;
+  systems = systems.map((entry) =>
+    entry.type === type ? sameTypeSystems[sameTypeIndex++] : entry,
+  );
   saveSystems();
   render();
+}
+
+function setupDragReordering(
+  tableBody: HTMLTableSectionElement,
+  type: SystemEntry["type"],
+) {
+  tableBody.addEventListener("dragstart", (event) => {
+    const target = event.target as HTMLElement;
+    const handle = target.closest(".drag-handle") as HTMLElement | null;
+    const row = handle?.closest("tr") as HTMLTableRowElement | null;
+    const id = handle?.dataset.id;
+    const system = systems.find((entry) => entry.id === id);
+
+    if (
+      !event.dataTransfer ||
+      !handle ||
+      !row ||
+      !id ||
+      system?.type !== type
+    ) {
+      event.preventDefault();
+      return;
+    }
+
+    draggedSystemId = id;
+    draggedSystemType = type;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    row.classList.add("system-row-dragging");
+  });
+
+  tableBody.addEventListener("dragover", (event) => {
+    if (!draggedSystemId || draggedSystemType !== type || !event.dataTransfer) {
+      return;
+    }
+
+    const row = getDragTargetRow(event.target);
+    if (!row || row.dataset.id === draggedSystemId) return;
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDropIndicator(row, getDropPosition(row, event));
+  });
+
+  tableBody.addEventListener("dragleave", (event) => {
+    const row = getDragTargetRow(event.target);
+    const relatedTarget = event.relatedTarget as Node | null;
+
+    if (row && relatedTarget && row.contains(relatedTarget)) return;
+    row?.classList.remove("system-row-drop-before", "system-row-drop-after");
+  });
+
+  tableBody.addEventListener("drop", (event) => {
+    const row = getDragTargetRow(event.target);
+
+    if (!draggedSystemId || draggedSystemType !== type || !row?.dataset.id) {
+      clearDragState(tableBody);
+      return;
+    }
+
+    event.preventDefault();
+    reorderSystemWithinType(
+      draggedSystemId,
+      row.dataset.id,
+      type,
+      getDropPosition(row, event),
+    );
+    clearDragState(tableBody);
+  });
+
+  tableBody.addEventListener("dragend", () => clearDragState(tableBody));
+}
+
+function getDragTargetRow(target: EventTarget | null) {
+  return target instanceof HTMLElement
+    ? (target.closest("tr[data-id]") as HTMLTableRowElement | null)
+    : null;
+}
+
+function getDropPosition(row: HTMLTableRowElement, event: DragEvent) {
+  const rowBounds = row.getBoundingClientRect();
+  return event.clientY > rowBounds.top + rowBounds.height / 2
+    ? "after"
+    : "before";
+}
+
+function setDropIndicator(
+  row: HTMLTableRowElement,
+  position: "before" | "after",
+) {
+  const tableBody = row.parentElement;
+  tableBody
+    ?.querySelectorAll(".system-row-drop-before, .system-row-drop-after")
+    .forEach((dropRow) =>
+      dropRow.classList.remove(
+        "system-row-drop-before",
+        "system-row-drop-after",
+      ),
+    );
+  row.classList.add(
+    position === "before" ? "system-row-drop-before" : "system-row-drop-after",
+  );
+}
+
+function clearDragState(tableBody: HTMLTableSectionElement) {
+  draggedSystemId = null;
+  draggedSystemType = null;
+  tableBody
+    .querySelectorAll(
+      ".system-row-dragging, .system-row-drop-before, .system-row-drop-after",
+    )
+    .forEach((row) =>
+      row.classList.remove(
+        "system-row-dragging",
+        "system-row-drop-before",
+        "system-row-drop-after",
+      ),
+    );
 }
 
 function exportSettings() {
@@ -1117,31 +1342,39 @@ async function importSettings(file: File) {
 }
 
 async function scanLocalNetwork() {
-  scanNetworkBtn.disabled = true;
-  scanNetworkBtn.title = "Scanning local subnet";
-  scanNetworkBtn.setAttribute("aria-label", "Scanning local subnet");
-  scanNetworkBtn.setAttribute("aria-busy", "true");
+  showView("scan");
+  refreshScanBtn.disabled = true;
+  refreshScanBtn.title = "Refreshing scan";
+  refreshScanBtn.setAttribute("aria-label", "Refreshing scan");
+  refreshScanBtn.setAttribute("aria-busy", "true");
   renderScanLoading();
-  scanModal.showModal();
 
   try {
     const result = await window.api.scanLocalNetwork();
-    renderScanResults(result);
+    latestScanReport = result;
+    saveScanReport();
     const warnings = await refreshStatuses();
+    renderScanResults(result);
     renderScanWarnings(warnings);
   } catch (err) {
-    scanSummary.textContent = "";
-    renderScanWarnings([]);
-    scanEmptyState.classList.remove("hidden");
+    if (latestScanReport) {
+      renderLatestScanReport();
+      scanSummary.textContent =
+        "Unable to refresh. Showing latest scan report.";
+    } else {
+      scanSummary.textContent = "No scan report yet.";
+      renderScanWarnings([]);
+      scanTable.innerHTML = "";
+      scanEmptyState.textContent =
+        "Refresh failed. Try again when the network is reachable.";
+      scanEmptyState.classList.remove("hidden");
+    }
     showAlert(err instanceof Error ? err.message : String(err), "error");
   } finally {
-    scanNetworkBtn.disabled = false;
-    scanNetworkBtn.title = "Scan local subnet and check mappings";
-    scanNetworkBtn.setAttribute(
-      "aria-label",
-      "Scan local subnet and check mappings",
-    );
-    scanNetworkBtn.removeAttribute("aria-busy");
+    refreshScanBtn.disabled = false;
+    refreshScanBtn.title = "Refresh scan";
+    refreshScanBtn.setAttribute("aria-label", "Refresh scan");
+    refreshScanBtn.removeAttribute("aria-busy");
   }
 }
 
@@ -1317,9 +1550,13 @@ addAjaBtn.addEventListener("click", () => {
   resetAjaForm();
   openAjaModal();
 });
-showDocsBtn.addEventListener("click", () => docsModal.showModal());
-showLogBtn.addEventListener("click", () => logModal.showModal());
-scanNetworkBtn.addEventListener("click", scanLocalNetwork);
+homeViewBtn.addEventListener("click", () => showView("home"));
+openGitHubBtn.addEventListener("click", () => window.api.openGitHub());
+showHomeBtn.addEventListener("click", () => showView("home"));
+showDocsBtn.addEventListener("click", () => showView("docs"));
+showLogBtn.addEventListener("click", () => showView("logs"));
+scanNetworkBtn.addEventListener("click", () => showView("scan"));
+refreshScanBtn.addEventListener("click", scanLocalNetwork);
 exportSettingsBtn.addEventListener("click", exportSettings);
 importSettingsBtn.addEventListener("click", () => importSettingsInput.click());
 importSettingsInput.addEventListener("change", () => {
@@ -1366,9 +1603,11 @@ scanTable.addEventListener("click", (event) => {
   portInput.value = "9";
   systemModalTitle.textContent = "Add System";
   saveSystemBtn.textContent = "Add System";
-  scanModal.close();
   openSystemModal();
 });
+
+setupDragReordering(ajaTable, "aja-ipmi");
+setupDragReordering(systemsTable, "wol");
 
 systemsTable.addEventListener("click", async (event) => {
   const target = event.target as HTMLElement;
@@ -1378,14 +1617,6 @@ systemsTable.addEventListener("click", async (event) => {
   const id = button.dataset.id;
   const system = systems.find((entry) => entry.id === id);
   if (!id || !system) return;
-
-  if (button.classList.contains("move-up")) {
-    moveSystem(id, -1);
-  }
-
-  if (button.classList.contains("move-down")) {
-    moveSystem(id, 1);
-  }
 
   if (button.classList.contains("wake-one") && isWolSystem(system)) {
     wakeEntries([system], [button as HTMLButtonElement]);
@@ -1437,14 +1668,6 @@ ajaTable.addEventListener("click", async (event) => {
   const id = button.dataset.id;
   const system = systems.find((entry) => entry.id === id);
   if (!id || !system || !isAjaSystem(system)) return;
-
-  if (button.classList.contains("move-up")) {
-    moveSystem(id, -1);
-  }
-
-  if (button.classList.contains("move-down")) {
-    moveSystem(id, 1);
-  }
 
   if (button.classList.contains("power-on-aja")) {
     powerAjaEntries([system], "on", [button as HTMLButtonElement]);
@@ -1570,6 +1793,11 @@ async function refreshStatuses(showResultAlert = false): Promise<string[]> {
     ajaResults.forEach((result) => ajaStatuses.set(result.id, result));
     render();
     warningDetails = getMappingWarningDetails(statusResults);
+
+    if (activeView === "scan" && latestScanReport) {
+      renderScanResults(latestScanReport);
+      renderScanWarnings(warningDetails);
+    }
 
     if (showResultAlert) {
       showAlert(

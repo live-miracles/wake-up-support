@@ -100,6 +100,10 @@ ipcMain.handle("scan-local-network", async () => {
   return scanLocalNetwork();
 });
 
+ipcMain.on("open-github", () => {
+  shell.openExternal("https://github.com/live-miracles/wake-up-support");
+});
+
 ipcMain.on("download-update", () => autoUpdater.downloadUpdate());
 ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
 
