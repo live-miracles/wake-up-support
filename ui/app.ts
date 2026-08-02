@@ -912,7 +912,9 @@ function getMaskedPasswordHint(password: string) {
 }
 
 function getMacStatusDotClass(status: SystemStatus) {
-  return getStatusDotBaseClass(status);
+  const colorClass = status === "online" ? "bg-primary" : "bg-base-content/30";
+
+  return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
 }
 
 function getIpStatusDotClass(
@@ -927,10 +929,10 @@ function getIpStatusDotClass(
 }
 
 function getMacStatusText(status: SystemStatus) {
-  if (status === "checking") return "Checking MAC status";
-  if (status === "online") return "MAC found on local network";
-  if (status === "offline") return "MAC not found on local network";
-  return "MAC status unknown";
+  if (status === "checking") return "Checking whether MAC is visible";
+  if (status === "online") return "MAC is visible on the local network";
+  if (status === "offline") return "MAC is not visible right now";
+  return "MAC visibility unknown";
 }
 
 function getIpStatusText(
