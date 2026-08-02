@@ -1,6 +1,6 @@
 {
   "name": "wake-up-support",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "Windows Wake-on-LAN helper for local network systems.",
   "main": "dist/main.js",
   "scripts": {
