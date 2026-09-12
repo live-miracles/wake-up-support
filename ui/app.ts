@@ -744,6 +744,17 @@ function render() {
                 </button>
             </td>
             <td class="text-base-content/60">${index + 1}</td>
+            <td>
+                <div class="flex items-center gap-2">
+                    <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
+                            <path d="m20 6-11 11-5-5" />
+                        </svg>
+                    </span>
+                    <button class="btn btn-primary btn-xs power-on-aja" data-id="${system.id}">On</button>
+                    <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Off</button>
+                </div>
+            </td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td>
                 <div class="flex items-center gap-2 font-mono">
@@ -761,13 +772,6 @@ function render() {
             <td class="font-mono">${escapeHtml(getMaskedPasswordHint(system.password))}</td>
             <td>
                 <div class="flex justify-end gap-2">
-                    <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
-                            <path d="m20 6-11 11-5-5" />
-                        </svg>
-                    </span>
-                    <button class="btn btn-primary btn-xs power-on-aja" data-id="${system.id}">On</button>
-                    <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Off</button>
                     <button class="btn btn-square btn-outline btn-xs edit-aja" data-id="${system.id}" title="Edit" aria-label="Edit">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
@@ -812,6 +816,16 @@ function render() {
                 </button>
             </td>
             <td class="text-base-content/60">${index + 1}</td>
+            <td>
+                <div class="flex items-center gap-2">
+                    <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
+                            <path d="m20 6-11 11-5-5" />
+                        </svg>
+                    </span>
+                    <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">On</button>
+                </div>
+            </td>
             <td class="font-semibold">${escapeHtml(system.name)}</td>
             <td>
                 <div class="flex items-center gap-2 font-mono">
@@ -838,12 +852,6 @@ function render() {
             <td class="font-mono">${escapeHtml(`${system.broadcastAddress}:${system.port}`)}</td>
             <td>
                 <div class="flex justify-end gap-2">
-                    <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24">
-                            <path d="m20 6-11 11-5-5" />
-                        </svg>
-                    </span>
-                    <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">On</button>
                     <button class="btn btn-square btn-outline btn-xs edit-one" data-id="${system.id}" title="Edit" aria-label="Edit">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
