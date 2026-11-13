@@ -1,31 +1,26 @@
 <!doctype html>
-<html data-theme="dim">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="./dist/output.css" rel="stylesheet" />
   </head>
-  <body class="h-screen overflow-hidden bg-base-100">
+  <body class="h-screen overflow-hidden bg-canvas text-ink">
     <div
       role="alert"
       id="alert"
-      class="alert fixed top-6 left-1/2 z-50 hidden max-w-[min(92vw,720px)] -translate-x-1/2 shadow-lg"
+      class="alert fixed top-6 left-1/2 z-50 hidden max-w-[min(92vw,720px)] -translate-x-1/2"
     >
       <span id="alert-text" class="whitespace-pre-line"></span>
     </div>
 
-    <div
-      class="toast toast-start toast-bottom z-9999 transition-all duration-200"
-    >
-      <div
-        id="update-toast"
-        class="alert hidden w-75 flex-col items-start gap-2 shadow-lg outline"
-      >
+    <div class="toast transition-all duration-200">
+      <div id="update-toast" class="alert alert-card hidden w-72 gap-2">
         <div class="font-semibold">Update available</div>
-        <div id="update-text" class="text-sm opacity-80">Checking...</div>
+        <div id="update-text" class="text-sm text-ink-subtle">Checking...</div>
         <progress
           id="update-progress"
-          class="progress progress-primary w-full hidden"
+          class="progress hidden"
           value="0"
           max="100"
         ></progress>
@@ -50,11 +45,17 @@
       id="zoom-ui"
       class="fixed top-4 right-4 z-40 hidden scale-90 opacity-0 transition-all duration-200"
     >
-      <div class="flex items-center gap-2 rounded bg-base-200 p-2 shadow-lg">
+      <div
+        class="panel flex items-center gap-2 bg-surface-3 p-2 shadow-[0_12px_32px_rgb(0_0_0/0.5)]"
+      >
         <button id="zoom-out" class="btn btn-square btn-sm" title="Zoom out">
           -
         </button>
-        <span id="zoom-level" class="w-12 text-center text-sm">100%</span>
+        <span
+          id="zoom-level"
+          class="w-12 text-center font-mono text-sm tabular-nums"
+          >100%</span
+        >
         <button id="zoom-in" class="btn btn-square btn-sm" title="Zoom in">
           +
         </button>
@@ -62,13 +63,16 @@
     </div>
 
     <dialog id="system-modal" class="modal">
-      <div class="modal-box max-w-xl">
+      <div class="modal-box">
         <div class="mb-4">
           <div>
-            <h2 id="system-modal-title" class="text-xl font-semibold">
+            <h2
+              id="system-modal-title"
+              class="text-lg font-semibold tracking-tight"
+            >
               Add System
             </h2>
-            <p class="mt-1 text-sm text-base-content/70">
+            <p class="mt-1 text-sm text-ink-subtle">
               Use the directed broadcast address for your subnet, for example
               <span class="font-mono">192.168.154.255</span>.
             </p>
@@ -78,8 +82,8 @@
         <form id="system-form" class="space-y-3" novalidate>
           <input id="editing-id" type="hidden" />
           <div class="grid gap-3 md:grid-cols-2">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">System name</legend>
+            <fieldset class="field">
+              <legend class="field-label">System name</legend>
               <input
                 id="name-input"
                 class="input w-full"
@@ -88,8 +92,8 @@
                 required
               />
             </fieldset>
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">MAC address</legend>
+            <fieldset class="field">
+              <legend class="field-label">MAC address</legend>
               <input
                 id="mac-input"
                 class="input w-full font-mono"
@@ -99,9 +103,9 @@
             </fieldset>
           </div>
           <div class="grid gap-3 md:grid-cols-[1fr_1fr_96px]">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">
-                IP address <span class="italic">(optional)</span>
+            <fieldset class="field">
+              <legend class="field-label">
+                IP address <em>(optional)</em>
               </legend>
               <input
                 id="ip-input"
@@ -110,16 +114,16 @@
                 autocomplete="off"
               />
             </fieldset>
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Broadcast address</legend>
+            <fieldset class="field">
+              <legend class="field-label">Broadcast address</legend>
               <input
                 id="broadcast-input"
                 class="input w-full font-mono"
                 placeholder="192.168.154.255"
               />
             </fieldset>
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Port</legend>
+            <fieldset class="field">
+              <legend class="field-label">Port</legend>
               <input
                 id="port-input"
                 class="input w-full"
@@ -131,12 +135,12 @@
             </fieldset>
           </div>
 
-          <p class="text-sm text-base-content/70">
+          <p class="text-sm text-ink-subtle">
             Wake-on-LAN also needs to be enabled in BIOS/UEFI and network
             adapter settings for each target system.
           </p>
 
-          <p id="system-form-error" class="hidden text-sm text-error"></p>
+          <p id="system-form-error" class="hidden text-sm text-danger"></p>
 
           <div class="modal-action">
             <button id="cancel-edit-btn" class="btn" type="button">
@@ -148,18 +152,15 @@
           </div>
         </form>
       </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
     </dialog>
 
     <dialog id="aja-modal" class="modal">
-      <div class="modal-box max-w-xl">
+      <div class="modal-box">
         <div class="mb-4">
-          <h2 id="aja-modal-title" class="text-xl font-semibold">
+          <h2 id="aja-modal-title" class="text-lg font-semibold tracking-tight">
             Add AJA Bridge Live
           </h2>
-          <p class="mt-1 text-sm text-base-content/70">
+          <p class="mt-1 text-sm text-ink-subtle">
             Use the IPMI management IP address and credentials from the AJA
             unit.
           </p>
@@ -168,8 +169,8 @@
         <form id="aja-form" class="space-y-3" novalidate>
           <input id="editing-aja-id" type="hidden" />
           <div class="grid gap-3 md:grid-cols-3">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">Device name</legend>
+            <fieldset class="field">
+              <legend class="field-label">Device name</legend>
               <input
                 id="aja-name-input"
                 class="input w-full"
@@ -177,8 +178,8 @@
                 autocomplete="off"
               />
             </fieldset>
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">AJA LAN 1 IPMI IP</legend>
+            <fieldset class="field">
+              <legend class="field-label">AJA LAN 1 IPMI IP</legend>
               <input
                 id="ipmi-ip-input"
                 class="input w-full font-mono"
@@ -186,8 +187,8 @@
                 autocomplete="off"
               />
             </fieldset>
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">IP address</legend>
+            <fieldset class="field">
+              <legend class="field-label">IP address</legend>
               <input
                 id="aja-ip-input"
                 class="input w-full font-mono"
@@ -197,8 +198,8 @@
             </fieldset>
           </div>
           <div class="grid gap-3 md:grid-cols-2">
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">IPMI username</legend>
+            <fieldset class="field">
+              <legend class="field-label">IPMI username</legend>
               <input
                 id="ipmi-user-input"
                 class="input w-full"
@@ -206,8 +207,8 @@
                 autocomplete="off"
               />
             </fieldset>
-            <fieldset class="fieldset">
-              <legend class="fieldset-legend">IPMI password</legend>
+            <fieldset class="field">
+              <legend class="field-label">IPMI password</legend>
               <label class="input flex w-full items-center gap-2">
                 <input
                   id="ipmi-pass-input"
@@ -242,13 +243,13 @@
               </label>
             </fieldset>
           </div>
-          <p class="text-sm text-base-content/70">
+          <p class="text-sm text-ink-subtle">
             AJA power control uses IPMI, not Wake-on-LAN. The app uses its
             bundled ipmiutil.exe automatically. Passwords are saved on this
             computer with the rest of the app settings.
           </p>
 
-          <p id="aja-form-error" class="hidden text-sm text-error"></p>
+          <p id="aja-form-error" class="hidden text-sm text-danger"></p>
 
           <div class="modal-action">
             <button id="cancel-aja-edit-btn" class="btn" type="button">
@@ -260,18 +261,12 @@
           </div>
         </form>
       </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
     </dialog>
 
     <dialog id="power-off-confirm-modal" class="modal">
-      <div class="modal-box max-w-md">
-        <h2 class="text-xl font-semibold">Turn Off Device?</h2>
-        <p
-          id="power-off-confirm-text"
-          class="mt-2 text-sm text-base-content/70"
-        >
+      <div class="modal-box modal-sm">
+        <h2 class="text-lg font-semibold tracking-tight">Turn Off Device?</h2>
+        <p id="power-off-confirm-text" class="mt-2 text-sm text-ink-subtle">
           This will send a power-off command to the selected AJA device.
         </p>
         <div class="modal-action">
@@ -287,15 +282,12 @@
           </form>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
-        <button value="cancel">close</button>
-      </form>
     </dialog>
 
     <dialog id="delete-confirm-modal" class="modal">
-      <div class="modal-box max-w-md">
-        <h2 class="text-xl font-semibold">Delete System?</h2>
-        <p id="delete-confirm-text" class="mt-2 text-sm text-base-content/70">
+      <div class="modal-box modal-sm">
+        <h2 class="text-lg font-semibold tracking-tight">Delete System?</h2>
+        <p id="delete-confirm-text" class="mt-2 text-sm text-ink-subtle">
           This will remove the selected system from the app.
         </p>
         <div class="modal-action">
@@ -311,34 +303,195 @@
           </form>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
-        <button value="cancel">close</button>
-      </form>
     </dialog>
 
     <main class="flex h-full flex-col">
       <header
-        class="sticky top-0 z-30 shrink-0 border-b border-base-300 bg-base-100 px-5 py-4"
+        class="sticky top-0 z-30 shrink-0 border-b border-line bg-canvas px-5 py-2.5"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="flex items-center gap-2">
-              <button
-                id="home-view-btn"
-                class="text-left text-2xl font-semibold"
-                title="Show home"
+          <button
+            id="home-view-btn"
+            class="flex items-center gap-3 rounded-lg text-left"
+            title="Show home"
+          >
+            <span
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white"
+              aria-hidden="true"
+            >
+              <svg
+                aria-hidden="true"
+                class="h-[18px] w-[18px]"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                viewBox="0 0 24 24"
               >
-                Wake Up Support
+                <path d="M12 2v10" />
+                <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
+              </svg>
+            </span>
+            <span class="flex flex-col">
+              <span class="text-[15px] leading-5 font-semibold tracking-tight"
+                >Wake Up Support</span
+              >
+              <span class="text-xs leading-4 text-ink-subtle"
+                >Wake-on-LAN and IPMI power control for local systems</span
+              >
+            </span>
+          </button>
+
+          <div class="flex flex-wrap items-center justify-end gap-1.5">
+            <nav class="flex items-center gap-1" aria-label="Views">
+              <button
+                id="show-home-btn"
+                class="btn btn-ghost btn-square btn-sm"
+                title="Home"
+                aria-label="Home"
+                aria-current="page"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-[18px] w-[18px]"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="m3 10 9-7 9 7" />
+                  <path d="M5 10v10h14V10" />
+                  <path d="M9 20v-6h6v6" />
+                </svg>
+              </button>
+              <button
+                id="show-docs-btn"
+                class="btn btn-ghost btn-square btn-sm"
+                title="Setup docs"
+                aria-label="Setup docs"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-[18px] w-[18px]"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 7v14" />
+                  <path
+                    d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4v14a4 4 0 0 0-4-4Z"
+                  />
+                  <path
+                    d="M21 18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4v14a4 4 0 0 1 4-4Z"
+                  />
+                </svg>
+              </button>
+              <button
+                id="scan-network-btn"
+                class="btn btn-ghost btn-square btn-sm"
+                title="Scan local subnet and check mappings"
+                aria-label="Scan local subnet and check mappings"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-[18px] w-[18px]"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M13.5 10.5 21 3" />
+                  <path d="M16 3h5v5" />
+                  <path d="M7.5 7.5a6 6 0 1 0 9 9" />
+                  <path d="M11 11a2 2 0 1 0 2 2" />
+                </svg>
+              </button>
+              <button
+                id="show-log-btn"
+                class="btn btn-ghost btn-square btn-sm"
+                title="Wake logs"
+                aria-label="Wake logs"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-[18px] w-[18px]"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 8v5l3 2" />
+                  <path d="M3.05 11a9 9 0 1 1 2.64 6.36" />
+                  <path d="M3 16v-5h5" />
+                </svg>
+              </button>
+            </nav>
+            <span
+              class="mx-1.5 h-5 w-px bg-line-strong"
+              aria-hidden="true"
+            ></span>
+            <div class="flex items-center gap-1">
+              <button
+                id="import-settings-btn"
+                class="btn btn-ghost btn-square btn-sm"
+                title="Import settings"
+                aria-label="Import settings"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-[18px] w-[18px]"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 3v12" />
+                  <path d="m7 10 5 5 5-5" />
+                  <path d="M5 21h14" />
+                </svg>
+              </button>
+              <button
+                id="export-settings-btn"
+                class="btn btn-ghost btn-square btn-sm"
+                title="Export settings"
+                aria-label="Export settings"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="h-[18px] w-[18px]"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 21V9" />
+                  <path d="m7 14 5-5 5 5" />
+                  <path d="M5 3h14" />
+                </svg>
               </button>
               <button
                 id="open-github-btn"
-                class="btn btn-square btn-outline btn-xs"
+                class="btn btn-ghost btn-square btn-sm"
                 title="Open GitHub"
                 aria-label="Open GitHub"
               >
                 <svg
                   aria-hidden="true"
-                  class="h-4 w-4"
+                  class="h-[18px] w-[18px]"
                   fill="currentColor"
                   viewBox="0 0 24 24"
                 >
@@ -348,142 +501,10 @@
                 </svg>
               </button>
             </div>
-            <p class="text-sm text-base-content/70">
-              Send Wake-on-LAN signals to systems on your local network.
-            </p>
-          </div>
-          <div class="flex flex-wrap justify-end gap-2">
-            <button
-              id="show-home-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Home"
-              aria-label="Home"
-            >
-              <svg
-                aria-hidden="true"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="m3 10 9-7 9 7" />
-                <path d="M5 10v10h14V10" />
-                <path d="M9 20v-6h6v6" />
-              </svg>
-            </button>
-            <button
-              id="show-docs-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Setup docs"
-              aria-label="Setup docs"
-            >
-              <svg
-                aria-hidden="true"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 7v14" />
-                <path
-                  d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4v14a4 4 0 0 0-4-4Z"
-                />
-                <path
-                  d="M21 18a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-5a4 4 0 0 0-4 4v14a4 4 0 0 1 4-4Z"
-                />
-              </svg>
-            </button>
-            <button
-              id="scan-network-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Scan local subnet and check mappings"
-              aria-label="Scan local subnet and check mappings"
-            >
-              <svg
-                aria-hidden="true"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M13.5 10.5 21 3" />
-                <path d="M16 3h5v5" />
-                <path d="M7.5 7.5a6 6 0 1 0 9 9" />
-                <path d="M11 11a2 2 0 1 0 2 2" />
-              </svg>
-            </button>
-            <button
-              id="show-log-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Wake logs"
-              aria-label="Wake logs"
-            >
-              <svg
-                aria-hidden="true"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 8v5l3 2" />
-                <path d="M3.05 11a9 9 0 1 1 2.64 6.36" />
-                <path d="M3 16v-5h5" />
-              </svg>
-            </button>
-            <button
-              id="import-settings-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Import settings"
-              aria-label="Import settings"
-            >
-              <svg
-                aria-hidden="true"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 3v12" />
-                <path d="m7 10 5 5 5-5" />
-                <path d="M5 21h14" />
-              </svg>
-            </button>
-            <button
-              id="export-settings-btn"
-              class="btn btn-square btn-outline btn-sm"
-              title="Export settings"
-              aria-label="Export settings"
-            >
-              <svg
-                aria-hidden="true"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 21V9" />
-                <path d="m7 14 5-5 5 5" />
-                <path d="M5 3h14" />
-              </svg>
-            </button>
+            <span
+              class="mx-1.5 h-5 w-px bg-line-strong"
+              aria-hidden="true"
+            ></span>
             <button
               id="add-system-btn"
               class="btn btn-outline btn-sm"
@@ -492,7 +513,7 @@
             >
               <svg
                 aria-hidden="true"
-                class="h-5 w-5"
+                class="h-4 w-4"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"
@@ -507,12 +528,12 @@
             </button>
             <button
               id="add-aja-btn"
-              class="btn btn-outline btn-sm"
+              class="btn btn-primary btn-sm"
               title="Add AJA Bridge Live"
             >
               <svg
                 aria-hidden="true"
-                class="h-5 w-5"
+                class="h-4 w-4"
                 fill="none"
                 stroke="currentColor"
                 stroke-linecap="round"
@@ -535,26 +556,68 @@
         </div>
       </header>
 
-      <section class="min-h-0 flex-1 overflow-y-auto p-4">
+      <section class="min-h-0 flex-1 overflow-y-auto p-5">
         <div class="mx-auto flex w-full max-w-7xl flex-col gap-5">
-          <div id="home-view" class="flex flex-col gap-5">
+          <div id="home-view" class="flex flex-col gap-6">
+            <div id="home-empty" class="hidden">
+              <div
+                class="panel flex flex-col items-center px-6 py-14 text-center"
+              >
+                <span
+                  class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-3 text-ink-subtle"
+                  aria-hidden="true"
+                >
+                  <svg
+                    class="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2v10" />
+                    <path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
+                  </svg>
+                </span>
+                <h2 class="text-base font-semibold tracking-tight">
+                  No systems yet
+                </h2>
+                <p class="mt-1 max-w-sm text-sm text-ink-subtle">
+                  Add a Wake-on-LAN system or an AJA Bridge Live device, or scan
+                  the local subnet to find devices on your network.
+                </p>
+                <div class="mt-5 flex flex-wrap justify-center gap-2">
+                  <button id="empty-add-wol-btn" class="btn btn-outline btn-sm">
+                    Add WOL system
+                  </button>
+                  <button id="empty-add-aja-btn" class="btn btn-primary btn-sm">
+                    Add AJA Bridge Live
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div id="aja-section">
-              <h2 class="mb-2 text-lg font-semibold">
-                AJA Bridge Live Devices
-              </h2>
-              <div class="overflow-x-auto rounded border border-base-300">
-                <table class="table table-fixed table-zebra table-sm">
+              <div class="mb-2.5 flex items-center gap-2">
+                <h2 class="text-sm font-semibold tracking-tight">
+                  AJA Bridge Live Devices
+                </h2>
+                <span id="aja-count" class="count-badge">0</span>
+              </div>
+              <div class="panel overflow-x-auto">
+                <table class="table">
                   <thead>
                     <tr>
                       <th class="w-10"></th>
-                      <th class="w-6">#</th>
-                      <th class="w-32"></th>
+                      <th class="w-1">#</th>
+                      <th class="w-1"></th>
                       <th>Name</th>
                       <th>LAN 1 IPMI IP</th>
                       <th>IP Address</th>
                       <th>Username</th>
                       <th>Password</th>
-                      <th class="w-28"></th>
+                      <th class="w-1"></th>
                     </tr>
                   </thead>
                   <tbody id="aja-table"></tbody>
@@ -563,19 +626,24 @@
             </div>
 
             <div id="wol-section">
-              <h2 class="mb-2 text-lg font-semibold">Wake-on-LAN Systems</h2>
-              <div class="overflow-x-auto rounded border border-base-300">
-                <table class="table table-fixed table-zebra table-sm">
+              <div class="mb-2.5 flex items-center gap-2">
+                <h2 class="text-sm font-semibold tracking-tight">
+                  Wake-on-LAN Systems
+                </h2>
+                <span id="wol-count" class="count-badge">0</span>
+              </div>
+              <div class="panel overflow-x-auto">
+                <table class="table">
                   <thead>
                     <tr>
                       <th class="w-10"></th>
-                      <th class="w-6">#</th>
-                      <th class="w-20"></th>
+                      <th class="w-1">#</th>
+                      <th class="w-1"></th>
                       <th>Name</th>
                       <th>MAC Address / Seen</th>
                       <th>IP Address</th>
                       <th>Broadcast:Port</th>
-                      <th class="w-24"></th>
+                      <th class="w-1"></th>
                     </tr>
                   </thead>
                   <tbody id="systems-table"></tbody>
@@ -585,13 +653,12 @@
           </div>
 
           <div id="scan-view" class="hidden">
-            <div class="mb-4 flex items-start justify-between gap-3">
+            <div class="mb-5 flex items-start justify-between gap-3">
               <div>
-                <h2 class="text-xl font-semibold">Network Scan</h2>
-                <p
-                  id="scan-summary"
-                  class="mt-1 text-sm text-base-content/70"
-                ></p>
+                <h2 class="text-lg font-semibold tracking-tight">
+                  Network Scan
+                </h2>
+                <p id="scan-summary" class="mt-1 text-sm text-ink-subtle"></p>
               </div>
               <button
                 id="refresh-scan-btn"
@@ -618,10 +685,10 @@
             </div>
             <div
               id="scan-warning-report"
-              class="mb-4 hidden rounded border border-warning/40 bg-warning/10 p-3 text-sm"
+              class="mb-4 hidden rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm"
             ></div>
-            <div class="overflow-x-auto rounded border border-base-300">
-              <table class="table table-zebra table-sm">
+            <div class="panel overflow-x-auto">
+              <table class="table">
                 <thead>
                   <tr>
                     <th class="w-12">#</th>
@@ -635,7 +702,7 @@
               </table>
               <div
                 id="scan-empty-state"
-                class="hidden p-8 text-center text-base-content/70"
+                class="hidden p-8 text-center text-ink-subtle"
               >
                 No scan report yet. Refresh to scan the local subnet.
               </div>
@@ -643,10 +710,10 @@
           </div>
 
           <div id="logs-view" class="hidden">
-            <div class="mb-4 flex items-start justify-between gap-3">
+            <div class="mb-5 flex items-start justify-between gap-3">
               <div>
-                <h2 class="text-xl font-semibold">Wake Log</h2>
-                <p class="mt-1 text-sm text-base-content/70">
+                <h2 class="text-lg font-semibold tracking-tight">Wake Log</h2>
+                <p class="mt-1 text-sm text-ink-subtle">
                   Recent wake and power actions from this computer.
                 </p>
               </div>
@@ -654,21 +721,21 @@
                 Clear
               </button>
             </div>
-            <div id="log-list" class="space-y-2 text-sm"></div>
+            <div id="log-list" class="space-y-1.5 text-sm"></div>
           </div>
 
           <div id="docs-view" class="hidden">
             <div class="mb-5">
-              <h2 class="text-xl font-semibold">Setup Docs</h2>
-              <p class="mt-1 text-sm text-base-content/70">
+              <h2 class="text-lg font-semibold tracking-tight">Setup Docs</h2>
+              <p class="mt-1 text-sm text-ink-subtle">
                 Enable the target hardware first, then add it to Wake Up
                 Support.
               </p>
             </div>
 
-            <div class="space-y-5 text-sm leading-6">
-              <section class="rounded border border-base-300 p-4">
-                <h3 class="text-base font-semibold">
+            <div class="max-w-3xl space-y-5 text-sm leading-6 text-ink-muted">
+              <section class="panel p-5">
+                <h3 class="text-sm font-semibold tracking-tight">
                   Dell systems: Wake-on-LAN
                 </h3>
                 <ol class="mt-3 list-decimal space-y-2 pl-5">
@@ -692,17 +759,17 @@
                     WOL port. Port 9 is the usual default.
                   </li>
                 </ol>
-                <p class="mt-3 text-base-content/70">
+                <p class="mt-3 text-ink-subtle">
                   The broadcast address should match the subnet, for example
                   <span class="font-mono">192.168.154.255</span>.
                 </p>
               </section>
 
-              <section class="rounded border border-base-300 p-4">
-                <h3 class="text-base font-semibold">
+              <section class="panel p-5">
+                <h3 class="text-sm font-semibold tracking-tight">
                   AJA Bridge Live: IPMI power control
                 </h3>
-                <p class="mt-3 text-base-content/70">
+                <p class="mt-3 text-ink-subtle">
                   AJA Bridge Live power control uses IPMI instead of
                   Wake-on-LAN. Use SSH to prepare the IPMI user, then add the
                   AJA LAN IPMI address and credentials in the app.
@@ -710,55 +777,63 @@
 
                 <div class="mt-4 space-y-4">
                   <div>
-                    <h4 class="font-semibold">Log in to the ABL CLI</h4>
+                    <h4 class="font-medium text-ink">Log in to the ABL CLI</h4>
                     <pre
-                      class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
                     ><code>ssh transcoder@&lt;abl-ip-address&gt;</code></pre>
                   </div>
 
                   <div>
-                    <h4 class="font-semibold">Find the IPMI LAN address</h4>
+                    <h4 class="font-medium text-ink">
+                      Find the IPMI LAN address
+                    </h4>
                     <pre
-                      class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
                     ><code>sudo ipmitool lan print</code></pre>
                   </div>
 
                   <div>
-                    <h4 class="font-semibold">Confirm the admin user number</h4>
-                    <p class="mt-1 text-base-content/70">
+                    <h4 class="font-medium text-ink">
+                      Confirm the admin user number
+                    </h4>
+                    <p class="mt-1 text-ink-subtle">
                       The admin user is usually user 2, but confirm it before
                       changing the password.
                     </p>
                     <pre
-                      class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
                     ><code>sudo ipmitool user list</code></pre>
                   </div>
 
                   <div>
-                    <h4 class="font-semibold">
+                    <h4 class="font-medium text-ink">
                       Set or reset the IPMI password
                     </h4>
                     <pre
-                      class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
                     ><code>sudo ipmitool user set password 2</code></pre>
                   </div>
 
                   <div>
-                    <h4 class="font-semibold">Enable admin IPMI access</h4>
+                    <h4 class="font-medium text-ink">
+                      Enable admin IPMI access
+                    </h4>
                     <pre
-                      class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
                     ><code>sudo ipmitool user enable 2
 sudo ipmitool channel setaccess 1 2 link=on ipmi=on callin=on privilege=4</code></pre>
                   </div>
 
                   <div>
-                    <h4 class="font-semibold">Fix channel cipher suites</h4>
-                    <p class="mt-1 text-base-content/70">
+                    <h4 class="font-medium text-ink">
+                      Fix channel cipher suites
+                    </h4>
+                    <p class="mt-1 text-ink-subtle">
                       Allow the standard LAN channel cipher suites and
                       explicitly permit cipher suite 3.
                     </p>
                     <pre
-                      class="mt-2 overflow-x-auto rounded bg-base-300 p-3 font-mono text-xs"
+                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
                     ><code>sudo ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
 sudo ipmitool raw 0x06 0x40 0x01 0x42 0x44</code></pre>
                   </div>

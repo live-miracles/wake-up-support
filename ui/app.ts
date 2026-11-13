@@ -227,6 +227,9 @@ const logsView = document.getElementById("logs-view")!;
 const docsView = document.getElementById("docs-view")!;
 const wolSection = document.getElementById("wol-section")!;
 const ajaSection = document.getElementById("aja-section")!;
+const homeEmpty = document.getElementById("home-empty")!;
+const ajaCount = document.getElementById("aja-count")!;
+const wolCount = document.getElementById("wol-count")!;
 const logList = document.getElementById("log-list")!;
 const scanSummary = document.getElementById("scan-summary")!;
 const scanWarningReport = document.getElementById("scan-warning-report")!;
@@ -697,7 +700,7 @@ function showAlert(
   durationMs = 3500,
 ) {
   alertBox.className =
-    "alert fixed top-6 left-1/2 z-50 max-w-[min(92vw,720px)] -translate-x-1/2 shadow-lg";
+    "alert fixed top-6 left-1/2 z-50 max-w-[min(92vw,720px)] -translate-x-1/2";
   alertBox.classList.add(
     type === "success"
       ? "alert-success"
@@ -721,6 +724,9 @@ function render() {
 
   ajaSection.classList.toggle("hidden", ajaSystems.length === 0);
   wolSection.classList.toggle("hidden", wolSystems.length === 0);
+  homeEmpty.classList.toggle("hidden", systems.length > 0);
+  ajaCount.textContent = String(ajaSystems.length);
+  wolCount.textContent = String(wolSystems.length);
 
   for (const [index, system] of ajaSystems.entries()) {
     const status = ajaStatuses.get(system.id);
@@ -743,7 +749,7 @@ function render() {
                     </svg>
                 </button>
             </td>
-            <td class="text-base-content/60">${index + 1}</td>
+            <td class="text-ink-faint tabular-nums">${index + 1}</td>
             <td>
                 <div class="flex items-center gap-2">
                     <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
@@ -755,21 +761,21 @@ function render() {
                     <button class="btn btn-outline btn-xs power-off-aja" data-id="${system.id}">Off</button>
                 </div>
             </td>
-            <td class="font-semibold">${escapeHtml(system.name)}</td>
+            <td class="font-medium whitespace-nowrap text-ink">${escapeHtml(system.name)}</td>
             <td>
-                <div class="flex items-center gap-2 font-mono">
+                <div class="flex items-center gap-2.5 font-mono text-[0.8125rem] whitespace-nowrap">
                     <span class="${getAjaPowerStatusDotClass(powerStatus)}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}"></span>
                     <span>${escapeHtml(system.ipmiIp)}</span>
                 </div>
             </td>
             <td>
-                <div class="flex items-center gap-2 font-mono">
+                <div class="flex items-center gap-2.5 font-mono text-[0.8125rem] whitespace-nowrap">
                     <span class="${getIpStatusDotClass(ipStatus, system)}" title="${getIpStatusText(ipStatus, system)}" aria-label="${getIpStatusText(ipStatus, system)}"></span>
                     <span>${escapeHtml(system.ipAddress || "-")}</span>
                 </div>
             </td>
-            <td>${escapeHtml(system.username)}</td>
-            <td class="font-mono">${escapeHtml(getMaskedPasswordHint(system.password))}</td>
+            <td class="text-ink-muted">${escapeHtml(system.username)}</td>
+            <td class="font-mono text-ink-subtle">${escapeHtml(getMaskedPasswordHint(system.password))}</td>
             <td>
                 <div class="flex justify-end gap-2">
                     <button class="btn btn-square btn-outline btn-xs edit-aja" data-id="${system.id}" title="Edit" aria-label="Edit">
@@ -777,7 +783,7 @@ function render() {
                             <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
                         </svg>
                     </button>
-                    <button class="btn btn-square btn-error btn-xs delete-one" data-id="${system.id}" title="Delete" aria-label="Delete">
+                    <button class="btn btn-square btn-danger btn-xs delete-one" data-id="${system.id}" title="Delete" aria-label="Delete">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M3 6h18" />
                             <path d="M8 6V4h8v2" />
@@ -815,7 +821,7 @@ function render() {
                     </svg>
                 </button>
             </td>
-            <td class="text-base-content/60">${index + 1}</td>
+            <td class="text-ink-faint tabular-nums">${index + 1}</td>
             <td>
                 <div class="flex items-center gap-2">
                     <span class="wake-success invisible flex h-6 w-4 items-center justify-center text-success" aria-hidden="true">
@@ -826,15 +832,15 @@ function render() {
                     <button class="btn btn-primary btn-xs wake-one" data-id="${system.id}">On</button>
                 </div>
             </td>
-            <td class="font-semibold">${escapeHtml(system.name)}</td>
+            <td class="font-medium whitespace-nowrap text-ink">${escapeHtml(system.name)}</td>
             <td>
-                <div class="flex items-center gap-2 font-mono">
+                <div class="flex items-center gap-2.5 font-mono text-[0.8125rem] whitespace-nowrap">
                     <span class="${getMacStatusDotClass(macStatus)}" title="${getMacStatusText(macStatus)}" aria-label="${getMacStatusText(macStatus)}"></span>
                     <span>${escapeHtml(system.macAddress)}</span>
                 </div>
             </td>
             <td>
-                <div class="flex items-center gap-2 font-mono" title="${escapedWarningText}">
+                <div class="flex items-center gap-2.5 font-mono text-[0.8125rem] whitespace-nowrap" title="${escapedWarningText}">
                     <span class="${getIpStatusDotClass(ipStatus, system)}" title="${getIpStatusText(ipStatus, system)}" aria-label="${getIpStatusText(ipStatus, system)}"></span>
                     <span class="${ipTextClass}">${escapeHtml(system.ipAddress || "-")}</span>
                     ${
@@ -849,7 +855,7 @@ function render() {
                     }
                 </div>
             </td>
-            <td class="font-mono">${escapeHtml(`${system.broadcastAddress}:${system.port}`)}</td>
+            <td class="font-mono text-[0.8125rem] text-ink-subtle">${escapeHtml(`${system.broadcastAddress}:${system.port}`)}</td>
             <td>
                 <div class="flex justify-end gap-2">
                     <button class="btn btn-square btn-outline btn-xs edit-one" data-id="${system.id}" title="Edit" aria-label="Edit">
@@ -857,7 +863,7 @@ function render() {
                             <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4Z" />
                         </svg>
                     </button>
-                    <button class="btn btn-square btn-error btn-xs delete-one" data-id="${system.id}" title="Delete" aria-label="Delete">
+                    <button class="btn btn-square btn-danger btn-xs delete-one" data-id="${system.id}" title="Delete" aria-label="Delete">
                         <svg aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                             <path d="M3 6h18" />
                             <path d="M8 6V4h8v2" />
@@ -874,25 +880,25 @@ function render() {
 }
 
 function getStatusDotBaseClass(status: SystemStatus) {
-  const colorClass =
+  const stateClass =
     status === "online"
-      ? "bg-primary"
+      ? "status-dot-online"
       : status === "offline"
-        ? "bg-error"
-        : "bg-base-content/30";
+        ? "status-dot-offline"
+        : "";
 
-  return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
+  return `status-dot ${stateClass}`;
 }
 
 function getAjaPowerStatusDotClass(status: AjaPowerStatus) {
-  const colorClass =
+  const stateClass =
     status === "on"
-      ? "bg-primary"
+      ? "status-dot-online"
       : status === "off" || status === "unreachable"
-        ? "bg-error"
-        : "bg-base-content/30";
+        ? "status-dot-offline"
+        : "";
 
-  return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
+  return `status-dot ${stateClass}`;
 }
 
 function getAjaPowerStatusText(status: AjaPowerStatus, message?: string) {
@@ -920,9 +926,7 @@ function getMaskedPasswordHint(password: string) {
 }
 
 function getMacStatusDotClass(status: SystemStatus) {
-  const colorClass = status === "online" ? "bg-primary" : "bg-base-content/30";
-
-  return `block h-3 w-3 shrink-0 rounded-full ${colorClass}`;
+  return `status-dot ${status === "online" ? "status-dot-online" : ""}`;
 }
 
 function getIpStatusDotClass(
@@ -930,7 +934,7 @@ function getIpStatusDotClass(
   system: Pick<SystemEntry, "ipAddress">,
 ) {
   if (!system.ipAddress) {
-    return "invisible block h-3 w-3 shrink-0 rounded-full";
+    return "status-dot invisible";
   }
 
   return getStatusDotBaseClass(status);
@@ -1001,12 +1005,24 @@ function getBroadcastAddress(ipAddress: string) {
     : DEFAULT_BROADCAST;
 }
 
+const navButtons: [AppView, HTMLButtonElement][] = [
+  ["home", showHomeBtn],
+  ["docs", showDocsBtn],
+  ["scan", scanNetworkBtn],
+  ["logs", showLogBtn],
+];
+
 function showView(view: AppView) {
   activeView = view;
   homeView.classList.toggle("hidden", view !== "home");
   scanView.classList.toggle("hidden", view !== "scan");
   logsView.classList.toggle("hidden", view !== "logs");
   docsView.classList.toggle("hidden", view !== "docs");
+
+  for (const [navView, button] of navButtons) {
+    if (navView === view) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
 
   if (view === "scan") renderLatestScanReport();
 }
@@ -1036,10 +1052,10 @@ function renderScanResults(result: NetworkScanResult) {
     const added = isScanDeviceAdded(device);
 
     tr.innerHTML = `
-            <td class="text-base-content/60">${index + 1}</td>
-            <td class="font-mono">${escapeHtml(device.ipAddress)}</td>
-            <td class="font-mono">${escapeHtml(device.macAddress)}</td>
-            <td>${escapeHtml(device.name || "-")}</td>
+            <td class="text-ink-faint tabular-nums">${index + 1}</td>
+            <td class="font-mono text-[0.8125rem]">${escapeHtml(device.ipAddress)}</td>
+            <td class="font-mono text-[0.8125rem] text-ink-muted">${escapeHtml(device.macAddress)}</td>
+            <td class="text-ink-muted">${escapeHtml(device.name || "-")}</td>
             <td>
                 ${
                   added
@@ -1071,7 +1087,7 @@ function renderScanWarnings(warnings: string[]) {
   scanWarningReport.appendChild(title);
 
   const list = document.createElement("ul");
-  list.className = "list-disc space-y-1 pl-5";
+  list.className = "list-disc space-y-1 pl-5 text-ink-muted";
 
   for (const warning of warnings) {
     const item = document.createElement("li");
@@ -1084,7 +1100,7 @@ function renderScanWarnings(warnings: string[]) {
 
 function renderScanLoading() {
   scanSummary.innerHTML =
-    '<span class="loading loading-spinner loading-sm text-primary"></span>';
+    '<span class="spinner" role="status" aria-label="Scanning"></span>';
   scanWarningReport.classList.add("hidden");
   scanWarningReport.innerHTML = "";
   scanTable.innerHTML = "";
@@ -1102,7 +1118,7 @@ function renderLog() {
 
   if (logEntries.length === 0) {
     const emptyLog = document.createElement("div");
-    emptyLog.className = "py-8 text-center text-base-content/70";
+    emptyLog.className = "panel py-10 text-center text-ink-subtle";
     emptyLog.textContent = "No wake logs yet.";
     logList.appendChild(emptyLog);
     return;
@@ -1110,8 +1126,24 @@ function renderLog() {
 
   for (const entry of logEntries) {
     const item = document.createElement("div");
-    item.className = `rounded border p-2 ${entry.ok ? "border-success/40 bg-success/10" : "border-error/40 bg-error/10"}`;
-    item.textContent = `${entry.time} - ${entry.message}`;
+    item.className =
+      "flex items-baseline gap-3 rounded-lg border border-line bg-surface-1 px-3 py-2.5";
+
+    const dot = document.createElement("span");
+    dot.className = `status-dot self-center ${entry.ok ? "status-dot-online" : "status-dot-offline"}`;
+    dot.setAttribute("role", "img");
+    dot.setAttribute("aria-label", entry.ok ? "Succeeded" : "Failed");
+
+    const time = document.createElement("span");
+    time.className =
+      "w-20 shrink-0 font-mono text-xs text-ink-faint tabular-nums";
+    time.textContent = entry.time;
+
+    const message = document.createElement("span");
+    message.className = "min-w-0 text-ink-muted";
+    message.textContent = entry.message;
+
+    item.append(dot, time, message);
     logList.appendChild(item);
   }
 }
@@ -1560,6 +1592,22 @@ addAjaBtn.addEventListener("click", () => {
   resetAjaForm();
   openAjaModal();
 });
+document
+  .getElementById("empty-add-wol-btn")!
+  .addEventListener("click", () => addSystemBtn.click());
+document
+  .getElementById("empty-add-aja-btn")!
+  .addEventListener("click", () => addAjaBtn.click());
+
+// Close a dialog when its backdrop is clicked. The dialog element itself has no
+// padding, so a click that targets it directly landed outside the panel.
+document
+  .querySelectorAll<HTMLDialogElement>("dialog.modal")
+  .forEach((dialog) => {
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  });
 homeViewBtn.addEventListener("click", () => showView("home"));
 openGitHubBtn.addEventListener("click", () => window.api.openGitHub());
 showHomeBtn.addEventListener("click", () => showView("home"));
