@@ -67,7 +67,7 @@ type NetworkScanResult = {
   devices: NetworkScanDevice[];
 };
 
-type AppView = "home" | "scan" | "logs" | "docs";
+type AppView = "home" | "scan" | "logs";
 
 type SettingsExport = {
   app: "wake-up-support";
@@ -106,7 +106,7 @@ type Api = {
     systems: SystemStatusRequest[],
   ) => Promise<SystemStatusResult[]>;
   scanLocalNetwork: () => Promise<NetworkScanResult>;
-  openGitHub: () => void;
+  openDocs: () => void;
   onUpdateAvailable: (cb: () => void) => void;
   onUpdateProgress: (cb: (progress: number) => void) => void;
   onUpdateReady: (cb: () => void) => void;
@@ -145,9 +145,6 @@ const systemModalTitle = document.getElementById("system-modal-title")!;
 const ajaModalTitle = document.getElementById("aja-modal-title")!;
 const homeViewBtn = document.getElementById(
   "home-view-btn",
-) as HTMLButtonElement;
-const openGitHubBtn = document.getElementById(
-  "open-github-btn",
 ) as HTMLButtonElement;
 const showHomeBtn = document.getElementById(
   "show-home-btn",
@@ -224,7 +221,6 @@ const ajaTable = document.getElementById(
 const homeView = document.getElementById("home-view")!;
 const scanView = document.getElementById("scan-view")!;
 const logsView = document.getElementById("logs-view")!;
-const docsView = document.getElementById("docs-view")!;
 const wolSection = document.getElementById("wol-section")!;
 const ajaSection = document.getElementById("aja-section")!;
 const homeEmpty = document.getElementById("home-empty")!;
@@ -1007,7 +1003,6 @@ function getBroadcastAddress(ipAddress: string) {
 
 const navButtons: [AppView, HTMLButtonElement][] = [
   ["home", showHomeBtn],
-  ["docs", showDocsBtn],
   ["scan", scanNetworkBtn],
   ["logs", showLogBtn],
 ];
@@ -1017,7 +1012,6 @@ function showView(view: AppView) {
   homeView.classList.toggle("hidden", view !== "home");
   scanView.classList.toggle("hidden", view !== "scan");
   logsView.classList.toggle("hidden", view !== "logs");
-  docsView.classList.toggle("hidden", view !== "docs");
 
   for (const [navView, button] of navButtons) {
     if (navView === view) button.setAttribute("aria-current", "page");
@@ -1609,9 +1603,8 @@ document
     });
   });
 homeViewBtn.addEventListener("click", () => showView("home"));
-openGitHubBtn.addEventListener("click", () => window.api.openGitHub());
 showHomeBtn.addEventListener("click", () => showView("home"));
-showDocsBtn.addEventListener("click", () => showView("docs"));
+showDocsBtn.addEventListener("click", () => window.api.openDocs());
 showLogBtn.addEventListener("click", () => showView("logs"));
 scanNetworkBtn.addEventListener("click", () => showView("scan"));
 refreshScanBtn.addEventListener("click", scanLocalNetwork);

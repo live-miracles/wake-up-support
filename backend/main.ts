@@ -100,8 +100,10 @@ ipcMain.handle("scan-local-network", async () => {
   return scanLocalNetwork();
 });
 
-ipcMain.on("open-github", () => {
-  shell.openExternal("https://github.com/live-miracles/wake-up-support");
+ipcMain.on("open-docs", () => {
+  shell.openExternal(
+    "https://live-miracles.github.io/projects/wake-up-support/docs/",
+  );
 });
 
 ipcMain.on("download-update", () => autoUpdater.downloadUpdate());

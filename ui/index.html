@@ -245,7 +245,7 @@
           </div>
           <p class="text-sm text-ink-subtle">
             AJA power control uses IPMI, not Wake-on-LAN. The app uses its
-            bundled ipmiutil.exe automatically. Passwords are saved on this
+            bundled ipmitool.exe automatically. Passwords are saved on this
             computer with the rest of the app settings.
           </p>
 
@@ -389,8 +389,8 @@
               <button
                 id="show-docs-btn"
                 class="btn btn-ghost btn-square btn-sm"
-                title="Setup docs"
-                aria-label="Setup docs"
+                title="Open setup docs (online)"
+                aria-label="Open setup docs (online)"
               >
                 <svg
                   aria-hidden="true"
@@ -500,23 +500,6 @@
                   <path d="M12 21V9" />
                   <path d="m7 14 5-5 5 5" />
                   <path d="M5 3h14" />
-                </svg>
-              </button>
-              <button
-                id="open-github-btn"
-                class="btn btn-ghost btn-square btn-sm"
-                title="Open GitHub"
-                aria-label="Open GitHub"
-              >
-                <svg
-                  aria-hidden="true"
-                  class="h-[18px] w-[18px]"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M12 0C5.37 0 0 5.5 0 12.3c0 5.44 3.44 10.04 8.2 11.67.6.11.82-.27.82-.6v-2.1c-3.34.75-4.04-1.65-4.04-1.65-.55-1.42-1.33-1.8-1.33-1.8-1.09-.77.08-.75.08-.75 1.2.09 1.84 1.27 1.84 1.27 1.07 1.88 2.8 1.34 3.49 1.02.1-.8.42-1.34.76-1.65-2.66-.31-5.46-1.36-5.46-6.08 0-1.34.47-2.44 1.24-3.3-.12-.31-.54-1.56.12-3.25 0 0 1.01-.33 3.3 1.26A11.2 11.2 0 0 1 12 5.93c1.02 0 2.05.14 3.01.41 2.29-1.59 3.3-1.26 3.3-1.26.66 1.69.24 2.94.12 3.25.77.86 1.23 1.96 1.23 3.3 0 4.73-2.8 5.76-5.48 6.07.43.38.82 1.13.82 2.28v3.39c0 .33.21.72.83.6A12.13 12.13 0 0 0 24 12.3C24 5.5 18.63 0 12 0Z"
-                  />
                 </svg>
               </button>
             </div>
@@ -741,124 +724,6 @@
               </button>
             </div>
             <div id="log-list" class="space-y-1.5 text-sm"></div>
-          </div>
-
-          <div id="docs-view" class="hidden">
-            <div class="mb-5">
-              <h2 class="text-lg font-semibold tracking-tight">Setup Docs</h2>
-              <p class="mt-1 text-sm text-ink-subtle">
-                Enable the target hardware first, then add it to Wake Up
-                Support.
-              </p>
-            </div>
-
-            <div class="max-w-3xl space-y-5 text-sm leading-6 text-ink-muted">
-              <section class="panel p-5">
-                <h3 class="text-sm font-semibold tracking-tight">
-                  Dell systems: Wake-on-LAN
-                </h3>
-                <ol class="mt-3 list-decimal space-y-2 pl-5">
-                  <li>
-                    Open the Dell BIOS/UEFI setup and enable Wake-on-LAN. On
-                    many Dell systems this is under Power Management.
-                  </li>
-                  <li>
-                    Enable any option that allows wake from the built-in wired
-                    network adapter. Use LAN only unless the site specifically
-                    needs wake from another power state.
-                  </li>
-                  <li>
-                    In Windows Device Manager, open the Ethernet adapter, then
-                    enable wake options in the Power Management and Advanced
-                    tabs.
-                  </li>
-                  <li>
-                    Add the system in Wake Up Support using the system name, MAC
-                    address, optional IP address, subnet broadcast address, and
-                    WOL port. Port 9 is the usual default.
-                  </li>
-                </ol>
-                <p class="mt-3 text-ink-subtle">
-                  The broadcast address should match the subnet, for example
-                  <span class="font-mono">192.168.154.255</span>.
-                </p>
-              </section>
-
-              <section class="panel p-5">
-                <h3 class="text-sm font-semibold tracking-tight">
-                  AJA Bridge Live: IPMI power control
-                </h3>
-                <p class="mt-3 text-ink-subtle">
-                  AJA Bridge Live power control uses IPMI instead of
-                  Wake-on-LAN. Use SSH to prepare the IPMI user, then add the
-                  AJA LAN IPMI address and credentials in the app.
-                </p>
-
-                <div class="mt-4 space-y-4">
-                  <div>
-                    <h4 class="font-medium text-ink">Log in to the ABL CLI</h4>
-                    <pre
-                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
-                    ><code>ssh transcoder@&lt;abl-ip-address&gt;</code></pre>
-                  </div>
-
-                  <div>
-                    <h4 class="font-medium text-ink">
-                      Find the IPMI LAN address
-                    </h4>
-                    <pre
-                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
-                    ><code>sudo ipmitool lan print</code></pre>
-                  </div>
-
-                  <div>
-                    <h4 class="font-medium text-ink">
-                      Confirm the admin user number
-                    </h4>
-                    <p class="mt-1 text-ink-subtle">
-                      The admin user is usually user 2, but confirm it before
-                      changing the password.
-                    </p>
-                    <pre
-                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
-                    ><code>sudo ipmitool user list</code></pre>
-                  </div>
-
-                  <div>
-                    <h4 class="font-medium text-ink">
-                      Set or reset the IPMI password
-                    </h4>
-                    <pre
-                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
-                    ><code>sudo ipmitool user set password 2</code></pre>
-                  </div>
-
-                  <div>
-                    <h4 class="font-medium text-ink">
-                      Enable admin IPMI access
-                    </h4>
-                    <pre
-                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
-                    ><code>sudo ipmitool user enable 2
-sudo ipmitool channel setaccess 1 2 link=on ipmi=on callin=on privilege=4</code></pre>
-                  </div>
-
-                  <div>
-                    <h4 class="font-medium text-ink">
-                      Fix channel cipher suites
-                    </h4>
-                    <p class="mt-1 text-ink-subtle">
-                      Allow the standard LAN channel cipher suites and
-                      explicitly permit cipher suite 3.
-                    </p>
-                    <pre
-                      class="mt-2 panel overflow-x-auto bg-canvas p-3 font-mono text-xs text-ink-muted"
-                    ><code>sudo ipmitool channel setaccess 1 2 callin=on ipmi=on link=on privilege=4
-sudo ipmitool raw 0x06 0x40 0x01 0x42 0x44</code></pre>
-                  </div>
-                </div>
-              </section>
-            </div>
           </div>
         </div>
       </section>
