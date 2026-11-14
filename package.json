@@ -1,6 +1,6 @@
 {
   "name": "wake-up-support",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Windows desktop app to power on PCs with Wake-on-LAN and control AJA Bridge Live devices over IPMI.",
   "main": "dist/main.js",
   "scripts": {
