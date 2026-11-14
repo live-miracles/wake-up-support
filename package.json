@@ -1,7 +1,7 @@
 {
   "name": "wake-up-support",
   "version": "1.4.1",
-  "description": "Windows Wake-on-LAN helper for local network systems.",
+  "description": "Windows desktop app to power on PCs with Wake-on-LAN and control AJA Bridge Live devices over IPMI.",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p backend && tsc -p preload && tsc -p ui && npm run css:build",
@@ -17,6 +17,14 @@
   },
   "keywords": [
     "wake-on-lan",
+    "wol",
+    "magic-packet",
+    "ipmi",
+    "ipmitool",
+    "aja",
+    "aja-bridge-live",
+    "power-management",
+    "network-tools",
     "electron",
     "windows"
   ],
