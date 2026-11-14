@@ -2,10 +2,10 @@
 
 /*
  * Design tokens, modelled on the Linear DESIGN.md from awesome-design-md:
- * a near-black canvas, a four-step surface ladder separated by hairline
- * borders (no shadows), and a single lavender accent used sparingly for the
- * brand mark, primary actions and focus rings. Green / amber / red appear only
- * as status colours.
+ * a warm near-black canvas, a four-step surface ladder separated by hairline
+ * borders (no shadows), and a single "sunrise" accent (amber -> orange -> red,
+ * taken from the logo) used sparingly for primary actions and focus rings.
+ * Green / amber / red also appear as status colours.
  */
 @theme {
   --font-sans:
@@ -15,22 +15,28 @@
     "Cascadia Mono", "JetBrains Mono", "SF Mono", ui-monospace, Consolas,
     monospace;
 
-  --color-canvas: #08090a;
-  --color-surface-1: #0f1011;
-  --color-surface-2: #141516;
-  --color-surface-3: #1a1b1d;
-  --color-line: #23252a;
-  --color-line-strong: #34343a;
-  --color-line-hover: #4a4b52;
+  --color-canvas: #0a0908;
+  --color-surface-1: #110f0e;
+  --color-surface-2: #171413;
+  --color-surface-3: #1f1b19;
+  --color-line: #2a2522;
+  --color-line-strong: #3b3430;
+  --color-line-hover: #554b44;
 
-  --color-ink: #f7f8f8;
-  --color-ink-muted: #d0d6e0;
-  --color-ink-subtle: #8a8f98;
-  --color-ink-faint: #62666d;
+  --color-ink: #faf6f2;
+  --color-ink-muted: #dcd3cb;
+  --color-ink-subtle: #9b918a;
+  --color-ink-faint: #6f665f;
 
-  --color-primary: #5e6ad2;
-  --color-primary-hover: #828fff;
-  --color-primary-focus: #5e69d1;
+  /* Sun palette (matches the logo). */
+  --color-sun-yellow: #ffb020;
+  --color-sun-orange: #ff8a1f;
+  --color-sun-red: #f2562b;
+
+  --color-primary: #ff8a1f;
+  --color-primary-hover: #ffa03d;
+  --color-primary-focus: #ff8a1f;
+  --color-on-primary: #1c0e02;
 
   --color-success: #3ecf5e;
   --color-warning: #f2b24c;
@@ -141,13 +147,18 @@
   }
 
   .btn-primary {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
+    background: linear-gradient(
+      135deg,
+      var(--color-sun-yellow),
+      var(--color-sun-orange)
+    );
+    border-color: var(--color-sun-orange);
+    color: var(--color-on-primary);
+    font-weight: 600;
   }
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
+    filter: brightness(1.1);
   }
 
   .btn-outline {
@@ -263,6 +274,29 @@
     flex: 1;
     min-width: 0;
     outline: none;
+  }
+
+  /* ---------- App header: sunrise hairline ---------- */
+  .app-header {
+    position: relative;
+  }
+  .app-header::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-sun-red),
+      var(--color-sun-orange),
+      var(--color-sun-yellow),
+      transparent
+    );
+    bottom: -1px;
+    content: "";
+    height: 1px;
+    left: 0;
+    opacity: 0.7;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
   }
 
   /* ---------- Containers ---------- */
@@ -447,7 +481,11 @@
     background: var(--color-surface-1);
   }
   .progress::-webkit-progress-value {
-    background: var(--color-primary);
+    background: linear-gradient(
+      90deg,
+      var(--color-sun-yellow),
+      var(--color-sun-orange)
+    );
     border-radius: 9999px;
     transition: width 200ms ease;
   }
