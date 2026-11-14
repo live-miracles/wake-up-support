@@ -50,3 +50,10 @@ sudo ipmitool raw 0x06 0x40 0x01 0x42 0x44
 Click **ABL** and enter the device name, the AJA LAN 1 IPMI IP, the AJA IP address and the
 IPMI username and password. Passwords are saved on this computer with the rest of the app
 settings.
+
+## Why the app uses ipmitool
+
+The first version of the app used `ipmiutil.exe` for AJA power control, but it did not work
+with AJA Bridge Live. The app now bundles `ipmitool.exe` (with the Cygwin DLLs it needs),
+which does connect to the AJA unit. Use the `ipmitool` commands above when preparing the
+device.
